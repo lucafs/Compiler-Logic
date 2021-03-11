@@ -26,22 +26,29 @@ class Tokenizer:
 
   def selectNext(self):
         #se for o ultimo acaba
+        teveEspaco = 0
         if (self.position >= len(self.origin)):
             self.actual = Token(tToken= "END")
             return self.actual
         if(self.position < len(self.origin)):
             #passa enquanto for espaço
-            # print("LEN {}".format(self.origin))
             while(self.origin[self.position] == " "):
                 self.position += 1
+                teveEspaco = 1
                 #se for o ultimo acaba
                 if (self.position >= len(self.origin)):
                     self.actual = Token(tToken= "END")
                     return self.actual
+
+            #checa se teve espaço entre numeros
+            if(teveEspaco == 1 and self.actual.type == "NUM" and tToken_finder(self.origin[self.position]) == "NUM"):
+                raise Exception ("Error espaço entre numeros")
+
+
             #Aqui achou o proximo token valido.
-            
             self.actual = Token(tToken= tToken_finder(self.origin[self.position]),value = self.origin[self.position])
             self.position += 1
+                
         return self.actual
 
         
@@ -65,8 +72,10 @@ class Parser():
                     resultado  = int(numAtual)
                 elif op == 1:
                     resultado -= int(numAtual)
+                    op = 0
                 elif op == 2:
                     resultado += int(numAtual)
+                    op = 0
                 
                 if (Parser.tokens.actual.type == "MIN"):
                     op = 1
@@ -77,6 +86,9 @@ class Parser():
 
             else:
                 raise Exception ("Comando errado")
+        #checa se não acaba com um operando.
+        if(op != 0):
+            raise Exception ("Comando errado")
         return resultado
 
 
@@ -95,6 +107,8 @@ def main():
     comando = ""
     for i in range(1,len(sys.argv)):
         comando += sys.argv[i]
+        comando += " "
+
     print(Parser().run(comando))
 
 
