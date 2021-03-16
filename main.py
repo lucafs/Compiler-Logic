@@ -1,5 +1,6 @@
 import re
 import sys
+import pyparsing
 
 
 def tToken_finder(char):
@@ -7,6 +8,10 @@ def tToken_finder(char):
             return "SUM"
         elif(char == "-"):
             return "MIN"
+        elif(char == "/"):
+            return "DIV"
+        elif(char == "*"):
+            return "MUT"
         else:
             return "NUM"
 
@@ -16,8 +21,12 @@ class Token:
     self.type = tToken
     self.value = value
 
-
-
+class PrePro():
+    @staticmethod
+    def filter(code):
+        comment = pyparsing.nestedExpr("/*", "*/").suppress()
+        print("No coment string:{}\n".format(comment.transformString(code)))
+        return comment.transformString(code)
 class Tokenizer:
   def __init__(self, origin = None, position = 0 ,actual = None):
     self.origin = origin #string
@@ -41,8 +50,9 @@ class Tokenizer:
                     return self.actual
 
             #checa se teve espaço entre numeros
-            if(teveEspaco == 1 and self.actual.type == "NUM" and tToken_finder(self.origin[self.position]) == "NUM"):
-                raise Exception ("Error espaço entre numeros")
+            if(self.actual != None):
+                if(teveEspaco == 1  and self.actual.type == "NUM" and tToken_finder(self.origin[self.position]) == "NUM"):
+                    raise Exception ("Error espaço entre numeros")
 
 
             #Aqui achou o proximo token valido.
@@ -58,8 +68,74 @@ class Parser():
     def __init__(self):
         self.tokens = Tokenizer
 
+
+    @staticmethod
+    def multiDiv():
+        Parser.tokens.selectNext()
+        op = 0
+        numPrevious = 0
+        resCode = ""
+        while(Parser.tokens.actual.type != "END"):
+            numAtual = ""
+            if(Parser.tokens.actual.type == "NUM"):
+                while(Parser.tokens.actual.type == "NUM"):
+                    numAtual += Parser.tokens.actual.value
+                    Parser.tokens.selectNext()
+                if op == 0:
+                    numPrevious = float(numAtual)
+                    op = 4
+                elif op == 1:
+                    numPrevious = numPrevious/float(numAtual)
+                    op = 5
+                elif op == 2:
+                    numPrevious = numPrevious*float(numAtual)
+                    op = 5
+                elif op == 3 :
+                    if(numPrevious != 0):
+                        resCode += str(numPrevious)
+                    resCode += "+"
+                    op = 5
+                    numPrevious = float(numAtual)
+
+                elif op == 4:
+                    if(numPrevious != 0):
+                        resCode += str(numPrevious)
+                    resCode += "-"
+                    numPrevious = float(numAtual)
+                    op = 5
+
+                if (Parser.tokens.actual.type == "DIV"):
+                    op = 1
+                    Parser.tokens.selectNext()
+                elif(Parser.tokens.actual.type == "MUT"):
+                    op = 2
+                    Parser.tokens.selectNext()
+                else:
+                    if(Parser.tokens.actual.type == "SUM"):
+                        op = 3
+                        Parser.tokens.selectNext()
+                    elif(Parser.tokens.actual.type == "MIN"):
+                        op = 4
+                        Parser.tokens.selectNext()
+            else:
+                raise Exception ("Comando errado")
+        #checa se não acaba com um operando.
+        if(op != 0 and op !=5):
+            raise Exception ("Comando errado")
+        if(numPrevious!= 0):
+            resCode += str(numPrevious)
+        Parser.tokens.position = 0
+        print("RESCODE {}".format(resCode))
+        Parser.tokens.origin = resCode
+
+
+
+
+
     @staticmethod
     def parseExpression():
+        Parser.multiDiv()
+
         Parser.tokens.selectNext()
         op = 0
         while(Parser.tokens.actual.type != "END"):
@@ -69,12 +145,12 @@ class Parser():
                     numAtual += Parser.tokens.actual.value
                     Parser.tokens.selectNext()
                 if op == 0:
-                    resultado  = int(numAtual)
+                    resultado  = float(numAtual)
                 elif op == 1:
-                    resultado -= int(numAtual)
+                    resultado -= float(numAtual)
                     op = 0
                 elif op == 2:
-                    resultado += int(numAtual)
+                    resultado += float(numAtual)
                     op = 0
                 
                 if (Parser.tokens.actual.type == "MIN"):
@@ -86,15 +162,15 @@ class Parser():
 
             else:
                 raise Exception ("Comando errado")
-        #checa se não acaba com um operando.
-        if(op != 0):
-            raise Exception ("Comando errado")
         return resultado
 
 
         
     @staticmethod
     def run(code):
+        #tira comentarios
+        code = PrePro().filter(code)
+        #executa o compilador
         Parser.tokens = Parser().tokens(origin = code) 
         return Parser().parseExpression()
     
@@ -108,8 +184,7 @@ def main():
     for i in range(1,len(sys.argv)):
         comando += sys.argv[i]
         comando += " "
-
-    print(Parser().run(comando))
+    print("{:.2f}".format(round(Parser().run(comando), 2)))
 
 
 if __name__ == "__main__":
