@@ -24,9 +24,9 @@ class Token:
 class PrePro():
     @staticmethod
     def filter(code):
-        comment = pyparsing.nestedExpr("/*", "*/").suppress()
-        print("No coment string:{}\n".format(comment.transformString(code)))
-        return comment.transformString(code)
+        stringWNComents = re.sub(re.compile("/\*([^*]|[\r\n]|(\*+([^*/]|[\r\n])))*\*+/",re.DOTALL ) ,"" ,code)
+        print(stringWNComents)
+        return stringWNComents
 class Tokenizer:
   def __init__(self, origin = None, position = 0 ,actual = None):
     self.origin = origin #string
@@ -73,7 +73,7 @@ class Parser():
     def multiDiv():
         Parser.tokens.selectNext()
         op = 0
-        numPrevious = 0
+        numPrevious = -1
         resCode = ""
         while(Parser.tokens.actual.type != "END"):
             numAtual = ""
@@ -83,7 +83,7 @@ class Parser():
                     Parser.tokens.selectNext()
                 if op == 0:
                     numPrevious = float(numAtual)
-                    op = 4
+                    op = 5
                 elif op == 1:
                     numPrevious = numPrevious/float(numAtual)
                     op = 5
@@ -91,14 +91,14 @@ class Parser():
                     numPrevious = numPrevious*float(numAtual)
                     op = 5
                 elif op == 3 :
-                    if(numPrevious != 0):
+                    if(numPrevious != -1):
                         resCode += str(numPrevious)
                     resCode += "+"
                     op = 5
                     numPrevious = float(numAtual)
 
                 elif op == 4:
-                    if(numPrevious != 0):
+                    if(numPrevious != -1):
                         resCode += str(numPrevious)
                     resCode += "-"
                     numPrevious = float(numAtual)
@@ -118,14 +118,14 @@ class Parser():
                         op = 4
                         Parser.tokens.selectNext()
             else:
-                raise Exception ("Comando errado")
+                raise Exception ("Comando começa com um operando")
         #checa se não acaba com um operando.
         if(op != 0 and op !=5):
-            raise Exception ("Comando errado")
-        if(numPrevious!= 0):
+            raise Exception ("Comando termina com um operando")
+        if(numPrevious!= -1):
             resCode += str(numPrevious)
         Parser.tokens.position = 0
-        print("RESCODE {}".format(resCode))
+        # print("RESCODE {}".format(resCode))
         Parser.tokens.origin = resCode
 
 
@@ -161,7 +161,7 @@ class Parser():
                     Parser.tokens.selectNext()
 
             else:
-                raise Exception ("Comando errado")
+                raise Exception ("Comando errado3")
         return resultado
 
 
@@ -184,7 +184,8 @@ def main():
     for i in range(1,len(sys.argv)):
         comando += sys.argv[i]
         comando += " "
-    print("{:.2f}".format(round(Parser().run(comando), 2)))
+    resultado = Parser().run(comando)
+    print("{:.0f}".format(round(resultado,2)))
 
 
 if __name__ == "__main__":
