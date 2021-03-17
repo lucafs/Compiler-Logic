@@ -25,7 +25,7 @@ class PrePro():
     @staticmethod
     def filter(code):
         stringWNComents = re.sub(re.compile("/\*([^*]|[\r\n]|(\*+([^*/]|[\r\n])))*\*+/",re.DOTALL ) ,"" ,code)
-        print(stringWNComents)
+        # print(stringWNComents)
         return stringWNComents
 class Tokenizer:
   def __init__(self, origin = None, position = 0 ,actual = None):
