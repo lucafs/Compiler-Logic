@@ -1,6 +1,5 @@
 import re
 import sys
-import pyparsing
 
 
 def tToken_finder(char):
@@ -12,8 +11,13 @@ def tToken_finder(char):
             return "DIV"
         elif(char == "*"):
             return "MUT"
+        elif(char == "("):
+            return "OPN"
+        elif(char == ")"):
+            return "CLS"
         else:
             return "NUM"
+
 
 
 class Token:
@@ -25,8 +29,8 @@ class PrePro():
     @staticmethod
     def filter(code):
         stringWNComents = re.sub(re.compile("/\*([^*]|[\r\n]|(\*+([^*/]|[\r\n])))*\*+/",re.DOTALL ) ,"" ,code)
-        # print(stringWNComents)
         return stringWNComents
+
 class Tokenizer:
   def __init__(self, origin = None, position = 0 ,actual = None):
     self.origin = origin #string
@@ -50,15 +54,22 @@ class Tokenizer:
                     return self.actual
 
             #checa se teve espaço entre numeros
-            if(self.actual != None):
-                if(teveEspaco == 1  and self.actual.type == "NUM" and tToken_finder(self.origin[self.position]) == "NUM"):
-                    raise Exception ("Error espaço entre numeros")
+            if(teveEspaco == 1 and self.actual.type == "NUM" and tToken_finder(self.origin[self.position]) == "NUM"):
+                raise Exception ("Error espaço entre numeros")
 
 
             #Aqui achou o proximo token valido.
+        
             self.actual = Token(tToken= tToken_finder(self.origin[self.position]),value = self.origin[self.position])
             self.position += 1
-                
+
+            if((self.position < len(self.origin)) and self.actual.type == "NUM"):
+                while(tToken_finder(self.origin[self.position]) == "NUM"):
+                    self.actual.value += self.origin[self.position]
+                    self.position += 1
+                    if(self.position == len(self.origin)):
+                        break
+
         return self.actual
 
         
@@ -68,102 +79,112 @@ class Parser():
     def __init__(self):
         self.tokens = Tokenizer
 
-
-    @staticmethod
-    def multiDiv():
-        Parser.tokens.selectNext()
-        op = 0
-        numPrevious = -1
-        resCode = ""
-        while(Parser.tokens.actual.type != "END"):
-            numAtual = ""
-            if(Parser.tokens.actual.type == "NUM"):
-                while(Parser.tokens.actual.type == "NUM"):
-                    numAtual += Parser.tokens.actual.value
-                    Parser.tokens.selectNext()
-                if op == 0:
-                    numPrevious = float(numAtual)
-                    op = 5
-                elif op == 1:
-                    numPrevious = numPrevious/float(numAtual)
-                    op = 5
-                elif op == 2:
-                    numPrevious = numPrevious*float(numAtual)
-                    op = 5
-                elif op == 3 :
-                    if(numPrevious != -1):
-                        resCode += str(numPrevious)
-                    resCode += "+"
-                    op = 5
-                    numPrevious = float(numAtual)
-
-                elif op == 4:
-                    if(numPrevious != -1):
-                        resCode += str(numPrevious)
-                    resCode += "-"
-                    numPrevious = float(numAtual)
-                    op = 5
-
-                if (Parser.tokens.actual.type == "DIV"):
-                    op = 1
-                    Parser.tokens.selectNext()
-                elif(Parser.tokens.actual.type == "MUT"):
-                    op = 2
-                    Parser.tokens.selectNext()
-                else:
-                    if(Parser.tokens.actual.type == "SUM"):
-                        op = 3
-                        Parser.tokens.selectNext()
-                    elif(Parser.tokens.actual.type == "MIN"):
-                        op = 4
-                        Parser.tokens.selectNext()
-            else:
-                raise Exception ("Comando começa com um operando")
-        #checa se não acaba com um operando.
-        if(op != 0 and op !=5):
-            raise Exception ("Comando termina com um operando")
-        if(numPrevious!= -1):
-            resCode += str(numPrevious)
-        Parser.tokens.position = 0
-        # print("RESCODE {}".format(resCode))
-        Parser.tokens.origin = resCode
-
-
-
-
-
     @staticmethod
     def parseExpression():
-        Parser.multiDiv()
-
         Parser.tokens.selectNext()
-        op = 0
-        while(Parser.tokens.actual.type != "END"):
-            numAtual = ""
+        res = Parser.parseTerm()
+
+        while(Parser.tokens.actual.type == "SUM" or Parser.tokens.actual.type == "MIN"):
+            if (Parser.tokens.actual.type == "SUM"):
+                Parser.tokens.selectNext()
+                if(Parser.tokens.actual.type == "NUM"):
+                    res += Parser.parseTerm()
+                elif(Parser.tokens.actual.type == "OPN"):
+                    res+=Parser.Expression()
+                else:
+                    if(Parser.tokens.actual.type == "SUM" or Parser.tokens.actual.type == "MIN"):
+                        res += Parser.unaryCalc()
+                    else:
+                        raise Exception('Comando errado1')
+
+            elif (Parser.tokens.actual.type == "MIN"):
+                Parser.tokens.selectNext()
+                if(Parser.tokens.actual.type == "NUM"):
+                    res -= Parser.parseTerm()
+                elif(Parser.tokens.actual.type == "OPN"):
+                    res-=Parser.Expression()
+                else:
+                    if(Parser.tokens.actual.type == "SUM" or Parser.tokens.actual.type == "MIN"):
+                        res += Parser.unaryCalc()
+                    raise Exception('Comando errado2')
+
+        if (Parser.tokens.actual.type == "END"):
+            return res
+        else:
+            raise Exception('Comando errado3')
+    
+    @staticmethod
+    def parseTerm():
+        if(Parser.tokens.actual.type == "NUM" or Parser.tokens.actual.type == "OPN"):
             if(Parser.tokens.actual.type == "NUM"):
-                while(Parser.tokens.actual.type == "NUM"):
-                    numAtual += Parser.tokens.actual.value
+                res = float(Parser.tokens.actual.value)
+            elif(Parser.tokens.actual.type == "OPN"):
+                res = Parser.Expression()
+            Parser.tokens.selectNext()
+            while(Parser.tokens.actual.type == "DIV" or Parser.tokens.actual.type == "MUT"):
+                if (Parser.tokens.actual.type == "DIV"):
                     Parser.tokens.selectNext()
-                if op == 0:
-                    resultado  = float(numAtual)
-                elif op == 1:
-                    resultado -= float(numAtual)
-                    op = 0
-                elif op == 2:
-                    resultado += float(numAtual)
-                    op = 0
-                
-                if (Parser.tokens.actual.type == "MIN"):
-                    op = 1
-                    Parser.tokens.selectNext()
-                elif(Parser.tokens.actual.type == "SUM"):
-                    op = 2
-                    Parser.tokens.selectNext()
+                    if(Parser.tokens.actual.type == "NUM"):
+                        res /= float(Parser.tokens.actual.value)
+                    elif(Parser.tokens.actual.type == "OPN"):
+                        res/=Parser.Expression()
+                    else:
+                        raise Exception('Comando errado4')
 
+                elif (Parser.tokens.actual.type == "MUT"):
+                    Parser.tokens.selectNext()
+                    if(Parser.tokens.actual.type == "NUM"):
+                        res *= float(Parser.tokens.actual.value)
+                    elif(Parser.tokens.actual.type == "OPN"):
+                        res*=Parser.Expression()
+                    else:
+                        raise Exception('Comando errado5')
+
+                Parser.tokens.selectNext()
+            return res
+        elif(Parser.tokens.actual.type == "SUM" or Parser.tokens.actual.type == "MIN"):
+            return Parser.unaryCalc()
+            
+        else:
+            raise Exception('Comando errado6')
+
+    @staticmethod
+    def Expression():
+        open = 1
+        Parser.tokens.selectNext()
+        dentroDoParenteses = ""
+        while(open !=0):
+            if(Parser.tokens.actual.type == "END"):
+                raise Exception("Did not close parenthesis")
+            elif(Parser.tokens.actual.type == "OPN"):
+                open +=1
+            elif(Parser.tokens.actual.type == "CLS"):
+                open -=1
             else:
-                raise Exception ("Comando errado3")
-        return resultado
+                dentroDoParenteses += Parser.tokens.actual.value
+            Parser.tokens.selectNext()
+        dentroDoParenteses = Parser().run(dentroDoParenteses)
+        return dentroDoParenteses
 
+    @staticmethod
+    def unaryCalc():
+        maisOuMenos = 0
+        while(Parser.tokens.actual.type == "SUM" or Parser.tokens.actual.type == "MIN"):
+            if(Parser.tokens.actual.type == "SUM"):
+                maisOuMenos += 1
+            else:
+                maisOuMenos -= 1
+            Parser.tokens.selectNext()
+        if(Parser.tokens.actual.type == "NUM"):
+            if(maisOuMenos < 0):
+                res = float(Parser.tokens.actual.value)* -1
+                Parser.tokens.selectNext()
+                return res
+            res = float(Parser.tokens.actual.value)
+            Parser.tokens.selectNext()
+            return res
+        else:
+            raise Exception('Unary error')
 
         
     @staticmethod
@@ -182,9 +203,11 @@ def main():
         raise Exception("Comando não passado")
     comando = ""
     for i in range(1,len(sys.argv)):
+        # print(sys.argv)
         comando += sys.argv[i]
         comando += " "
     resultado = Parser().run(comando)
+
     print("{:.0f}".format(round(resultado,2)))
 
 
