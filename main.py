@@ -53,10 +53,6 @@ class Tokenizer:
                     self.actual = Token(tToken= "END")
                     return self.actual
 
-            #checa se teve espaço entre numeros
-            if(teveEspaco == 1 and self.actual.type == "NUM" and tToken_finder(self.origin[self.position]) == "NUM"):
-                raise Exception ("Error espaço entre numeros")
-
 
             #Aqui achou o proximo token valido.
         
@@ -69,6 +65,9 @@ class Tokenizer:
                     self.position += 1
                     if(self.position == len(self.origin)):
                         break
+                    elif(self.origin[self.position - 1 ] == " " and tToken_finder(self.origin[self.position]) == "NUM"):
+                        raise Exception ("Espaço entre numeros")
+                    
 
         return self.actual
 
@@ -80,111 +79,62 @@ class Parser():
         self.tokens = Tokenizer
 
     @staticmethod
-    def parseExpression():
+    def parseFactor():
+
         Parser.tokens.selectNext()
+        res = 0
+        if(Parser.tokens.actual.type == "NUM"):
+            res = int(Parser.tokens.actual.value)
+            Parser.tokens.selectNext()
+        elif(Parser.tokens.actual.type == "SUM" or Parser.tokens.actual.type == "MIN"):
+            if(Parser.tokens.actual.type == "SUM"):
+                res += int(Parser.parseFactor())
+                # Parser.tokens.selectNext()
+            elif(Parser.tokens.actual.type == "MIN"):
+                res -= int(Parser.parseFactor())
+                # Parser.tokens.selectNext()
+        elif(Parser.tokens.actual.type == "OPN"):
+            res = Parser.parseExpression()
+            if(Parser.tokens.actual.type != "CLS"):
+                raise Exception ("Parenteses não fechados")
+            Parser.tokens.selectNext()
+
+        else:
+            raise Exception ("Factor error")    
+        return res
+
+
+    @staticmethod
+    def parseExpression():
+        # Parser.tokens.selectNext()
         res = Parser.parseTerm()
 
         while(Parser.tokens.actual.type == "SUM" or Parser.tokens.actual.type == "MIN"):
             if (Parser.tokens.actual.type == "SUM"):
-                Parser.tokens.selectNext()
-                if(Parser.tokens.actual.type == "NUM"):
-                    res += Parser.parseTerm()
-                elif(Parser.tokens.actual.type == "OPN"):
-                    res+=Parser.Expression()
-                else:
-                    if(Parser.tokens.actual.type == "SUM" or Parser.tokens.actual.type == "MIN"):
-                        res += Parser.unaryCalc()
-                    else:
-                        raise Exception('Comando errado1')
+                # Parser.tokens.selectNext()
+                res += int(Parser.parseTerm())
 
             elif (Parser.tokens.actual.type == "MIN"):
-                Parser.tokens.selectNext()
-                if(Parser.tokens.actual.type == "NUM"):
-                    res -= Parser.parseTerm()
-                elif(Parser.tokens.actual.type == "OPN"):
-                    res-=Parser.Expression()
-                else:
-                    if(Parser.tokens.actual.type == "SUM" or Parser.tokens.actual.type == "MIN"):
-                        res += Parser.unaryCalc()
-                    raise Exception('Comando errado2')
+                # Parser.tokens.selectNext()
+                res -= int(Parser.parseTerm())
 
-        if (Parser.tokens.actual.type == "END"):
-            return res
-        else:
-            raise Exception('Comando errado3')
-    
+        return res
+
     @staticmethod
     def parseTerm():
-        if(Parser.tokens.actual.type == "NUM" or Parser.tokens.actual.type == "OPN"):
-            if(Parser.tokens.actual.type == "NUM"):
-                res = float(Parser.tokens.actual.value)
-            elif(Parser.tokens.actual.type == "OPN"):
-                res = Parser.Expression()
-            Parser.tokens.selectNext()
-            while(Parser.tokens.actual.type == "DIV" or Parser.tokens.actual.type == "MUT"):
-                if (Parser.tokens.actual.type == "DIV"):
-                    Parser.tokens.selectNext()
-                    if(Parser.tokens.actual.type == "NUM"):
-                        res /= float(Parser.tokens.actual.value)
-                    elif(Parser.tokens.actual.type == "OPN"):
-                        res/=Parser.Expression()
-                    else:
-                        raise Exception('Comando errado4')
+        res = int(Parser.parseFactor())
+        while(Parser.tokens.actual.type == "MUT" or Parser.tokens.actual.type == "DIV"):
+            if(Parser.tokens.actual.type == "MUT"):
+                # Parser.tokens.selectNext()
+                res *= int(Parser.parseFactor())
 
-                elif (Parser.tokens.actual.type == "MUT"):
-                    Parser.tokens.selectNext()
-                    if(Parser.tokens.actual.type == "NUM"):
-                        res *= float(Parser.tokens.actual.value)
-                    elif(Parser.tokens.actual.type == "OPN"):
-                        res*=Parser.Expression()
-                    else:
-                        raise Exception('Comando errado5')
+            elif(Parser.tokens.actual.type == "DIV"):
+                # Parser.tokens.selectNext()
+                res += int(Parser.parseFactor())
 
-                Parser.tokens.selectNext()
-            return res
-        elif(Parser.tokens.actual.type == "SUM" or Parser.tokens.actual.type == "MIN"):
-            return Parser.unaryCalc()
-            
-        else:
-            raise Exception('Comando errado6')
+        return res
 
-    @staticmethod
-    def Expression():
-        open = 1
-        Parser.tokens.selectNext()
-        dentroDoParenteses = ""
-        while(open !=0):
-            if(Parser.tokens.actual.type == "END"):
-                raise Exception("Did not close parenthesis")
-            elif(Parser.tokens.actual.type == "OPN"):
-                open +=1
-            elif(Parser.tokens.actual.type == "CLS"):
-                open -=1
-            else:
-                dentroDoParenteses += Parser.tokens.actual.value
-            Parser.tokens.selectNext()
-        dentroDoParenteses = Parser().run(dentroDoParenteses)
-        return dentroDoParenteses
 
-    @staticmethod
-    def unaryCalc():
-        maisOuMenos = 0
-        while(Parser.tokens.actual.type == "SUM" or Parser.tokens.actual.type == "MIN"):
-            if(Parser.tokens.actual.type == "SUM"):
-                maisOuMenos += 1
-            else:
-                maisOuMenos -= 1
-            Parser.tokens.selectNext()
-        if(Parser.tokens.actual.type == "NUM"):
-            if(maisOuMenos < 0):
-                res = float(Parser.tokens.actual.value)* -1
-                Parser.tokens.selectNext()
-                return res
-            res = float(Parser.tokens.actual.value)
-            Parser.tokens.selectNext()
-            return res
-        else:
-            raise Exception('Unary error')
 
         
     @staticmethod
