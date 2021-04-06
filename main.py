@@ -80,7 +80,6 @@ class Tokenizer:
             #passa enquanto for espaço
             while(self.origin[self.position] == " "):
                 self.position += 1
-                teveEspaco = 1
                 #se for o ultimo acaba
                 if (self.position >= len(self.origin)):
                     self.actual = Token(tToken= "END")
@@ -98,8 +97,7 @@ class Tokenizer:
                     self.position += 1
                     if(self.position == len(self.origin)):
                         break
-                    elif(self.origin[self.position - 1 ] == " " and tToken_finder(self.origin[self.position]) == "NUM"):
-                        raise Exception ("Espaço entre numeros")                
+           
         return self.actual
 
         
