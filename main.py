@@ -47,7 +47,6 @@ class Tokenizer:
             #passa enquanto for espaço
             while(self.origin[self.position] == " "):
                 self.position += 1
-                teveEspaco = 1
                 #se for o ultimo acaba
                 if (self.position >= len(self.origin)):
                     self.actual = Token(tToken= "END")
@@ -65,8 +64,6 @@ class Tokenizer:
                     self.position += 1
                     if(self.position == len(self.origin)):
                         break
-                    elif(self.origin[self.position - 1 ] == " " and tToken_finder(self.origin[self.position]) == "NUM"):
-                        raise Exception ("Espaço entre numeros")
                     
 
         return self.actual
@@ -106,16 +103,13 @@ class Parser():
 
     @staticmethod
     def parseExpression():
-        # Parser.tokens.selectNext()
         res = Parser.parseTerm()
 
         while(Parser.tokens.actual.type == "SUM" or Parser.tokens.actual.type == "MIN"):
             if (Parser.tokens.actual.type == "SUM"):
-                # Parser.tokens.selectNext()
                 res += int(Parser.parseTerm())
 
             elif (Parser.tokens.actual.type == "MIN"):
-                # Parser.tokens.selectNext()
                 res -= int(Parser.parseTerm())
 
         return res
@@ -125,12 +119,10 @@ class Parser():
         res = int(Parser.parseFactor())
         while(Parser.tokens.actual.type == "MUT" or Parser.tokens.actual.type == "DIV"):
             if(Parser.tokens.actual.type == "MUT"):
-                # Parser.tokens.selectNext()
                 res *= int(Parser.parseFactor())
 
             elif(Parser.tokens.actual.type == "DIV"):
-                # Parser.tokens.selectNext()
-                res += int(Parser.parseFactor())
+                res /= int(Parser.parseFactor())
 
         return res
 
