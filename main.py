@@ -182,7 +182,10 @@ class Parser():
         code = PrePro().filter(code)
         #executa o compilador
         Parser.tokens = Parser().tokens(origin = code) 
-        return Parser().parseExpression()
+        res =  Parser().parseExpression()
+        if(Parser.tokens.actual.type != "END"):
+            raise Exception ("ERROR")
+        return res
     
 
         
