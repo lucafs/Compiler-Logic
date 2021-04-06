@@ -1,6 +1,6 @@
 import re
 import sys
-
+from abc import ABC, abstractmethod
 
 def tToken_finder(char):
         if (char == "+"):
@@ -17,6 +17,39 @@ def tToken_finder(char):
             return "CLS"
         else:
             return "NUM"
+
+
+class Node():
+    def __init__(self,value = None , children = []):
+        self.value = value
+        self.children = []
+    def evaluate(self):
+        pass
+
+class NoOp(Node):
+    def Evaluate(self):
+        pass
+
+class IntVal(Node):
+    def Evaluate(self):
+        return self.value
+class UnOp(Node):
+    def Evaluate(self):
+        if self.value == '+':
+            return self.children[0].Evaluate()
+        else:
+            return -self.children[0].Evaluate()
+
+class BinOP(Node):
+    def Evaluate(self):
+        if (self.value=="+"):
+            return int(self.children[0].Evaluate()) + int(self.children[1].Evaluate())
+        if (self.value=="-"):
+            return int(self.children[0].Evaluate()) - int(self.children[1].Evaluate())
+        if (self.value=="*"):
+            return int(self.children[0].Evaluate()) * int(self.children[1].Evaluate())
+        if (self.value=="/"):
+            return int(self.children[0].Evaluate()) // int(self.children[1].Evaluate())
 
 
 
@@ -66,9 +99,7 @@ class Tokenizer:
                     if(self.position == len(self.origin)):
                         break
                     elif(self.origin[self.position - 1 ] == " " and tToken_finder(self.origin[self.position]) == "NUM"):
-                        raise Exception ("Espaço entre numeros")
-                    
-
+                        raise Exception ("Espaço entre numeros")                
         return self.actual
 
         
@@ -84,53 +115,63 @@ class Parser():
         Parser.tokens.selectNext()
         res = 0
         if(Parser.tokens.actual.type == "NUM"):
-            res = int(Parser.tokens.actual.value)
+            res = Parser.tokens.actual.value
+            node = IntVal(res)
             Parser.tokens.selectNext()
+            return node
+
         elif(Parser.tokens.actual.type == "SUM" or Parser.tokens.actual.type == "MIN"):
             if(Parser.tokens.actual.type == "SUM"):
-                res += int(Parser.parseFactor())
-                # Parser.tokens.selectNext()
+                node = UnOp("+", [])
+                node.children.append(Parser.parseFactor())    
+                return node            
             elif(Parser.tokens.actual.type == "MIN"):
-                res -= int(Parser.parseFactor())
-                # Parser.tokens.selectNext()
+                node = UnOp("-", [])
+                node.children.append(Parser.parseFactor())   
+                return node
         elif(Parser.tokens.actual.type == "OPN"):
             res = Parser.parseExpression()
             if(Parser.tokens.actual.type != "CLS"):
                 raise Exception ("Parenteses não fechados")
             Parser.tokens.selectNext()
+            return res
+
 
         else:
             raise Exception ("Factor error")    
-        return res
 
 
     @staticmethod
     def parseExpression():
-        # Parser.tokens.selectNext()
         res = Parser.parseTerm()
 
         while(Parser.tokens.actual.type == "SUM" or Parser.tokens.actual.type == "MIN"):
             if (Parser.tokens.actual.type == "SUM"):
-                # Parser.tokens.selectNext()
-                res += int(Parser.parseTerm())
+                node = BinOP("+",[])
+                node.children.append(res)
+                node.children.append(Parser.parseTerm())
 
             elif (Parser.tokens.actual.type == "MIN"):
-                # Parser.tokens.selectNext()
-                res -= int(Parser.parseTerm())
-
+                node = BinOP("-",[])
+                node.children.append(res)
+                node.children.append(Parser.parseTerm())
+            res = node
         return res
 
     @staticmethod
     def parseTerm():
-        res = int(Parser.parseFactor())
+        res = Parser.parseFactor()
         while(Parser.tokens.actual.type == "MUT" or Parser.tokens.actual.type == "DIV"):
             if(Parser.tokens.actual.type == "MUT"):
-                # Parser.tokens.selectNext()
-                res *= int(Parser.parseFactor())
+                node = BinOP("*",[])
+                node.children.append(res)
+                node.children.append(Parser.parseFactor())
 
             elif(Parser.tokens.actual.type == "DIV"):
-                # Parser.tokens.selectNext()
-                res += int(Parser.parseFactor())
+                node = BinOP("/",[])
+                node.children.append(res)
+                node.children.append(Parser.parseFactor())
+            res = node
 
         return res
 
@@ -147,19 +188,18 @@ class Parser():
     
 
         
-
 def main():
     if(len(sys.argv) < 2):
         raise Exception("Comando não passado")
-    comando = ""
+    file = ""
     for i in range(1,len(sys.argv)):
-        # print(sys.argv)
-        comando += sys.argv[i]
-        comando += " "
+        file += sys.argv[i]
+    f = open(file,'r')
+    comando = f.read()
     resultado = Parser().run(comando)
+    resultado = resultado.Evaluate()
 
-    print("{:.0f}".format(round(resultado,2)))
-
+    print(resultado)
 
 if __name__ == "__main__":
     main()
