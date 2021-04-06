@@ -1,5 +1,6 @@
 import re
 import sys
+import math
 
 
 def tToken_finder(char):
@@ -39,7 +40,6 @@ class Tokenizer:
 
   def selectNext(self):
         #se for o ultimo acaba
-        teveEspaco = 0
         if (self.position >= len(self.origin)):
             self.actual = Token(tToken= "END")
             return self.actual
@@ -86,10 +86,8 @@ class Parser():
         elif(Parser.tokens.actual.type == "SUM" or Parser.tokens.actual.type == "MIN"):
             if(Parser.tokens.actual.type == "SUM"):
                 res += int(Parser.parseFactor())
-                # Parser.tokens.selectNext()
             elif(Parser.tokens.actual.type == "MIN"):
                 res -= int(Parser.parseFactor())
-                # Parser.tokens.selectNext()
         elif(Parser.tokens.actual.type == "OPN"):
             res = Parser.parseExpression()
             if(Parser.tokens.actual.type != "CLS"):
@@ -135,7 +133,10 @@ class Parser():
         code = PrePro().filter(code)
         #executa o compilador
         Parser.tokens = Parser().tokens(origin = code) 
-        return Parser().parseExpression()
+        res = Parser().parseExpression()
+        if Parser.tokens.actual.type != 'END':
+            raise Exception("ERRO")
+        return res
     
 
         
@@ -145,12 +146,10 @@ def main():
         raise Exception("Comando não passado")
     comando = ""
     for i in range(1,len(sys.argv)):
-        # print(sys.argv)
         comando += sys.argv[i]
         comando += " "
     resultado = Parser().run(comando)
-
-    print("{:.0f}".format(round(resultado,2)))
+    print(math.floor(resultado))
 
 
 if __name__ == "__main__":
