@@ -32,7 +32,7 @@ class NoOp(Node):
 
 class IntVal(Node):
     def Evaluate(self):
-        return self.value
+        return int(self.value)
 class UnOp(Node):
     def Evaluate(self):
         if self.value == '+':
