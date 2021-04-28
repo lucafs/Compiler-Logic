@@ -15,41 +15,81 @@ def tToken_finder(char):
             return "OPN"
         elif(char == ")"):
             return "CLS"
-        else:
+        elif(char == "="):
+            return "EQL"
+        elif(char == ";"):
+            return "ENDCOM"
+        elif(char.isalpha()):
+            return "IDENT"
+        elif(char.isdigit()):
             return "NUM"
+        else:
+            raise Exception("Char not known")
+
+class SymbolTable:
+
+    def __init__(self):
+        self.sym = {}
+
+    def setter(self, name, value):
+        self.sym[name] = value
+
+    def getter(self, name):
+        return self.sym[name]
 
 
 class Node():
     def __init__(self,value = None , children = []):
         self.value = value
         self.children = []
-    def evaluate(self):
+    def Evaluate(self,ST):
         pass
 
 class NoOp(Node):
-    def Evaluate(self):
+    def Evaluate(self,ST):
         pass
 
+
 class IntVal(Node):
-    def Evaluate(self):
+    def Evaluate(self,ST):
         return int(self.value)
 class UnOp(Node):
-    def Evaluate(self):
+    def Evaluate(self,ST):
         if self.value == '+':
-            return self.children[0].Evaluate()
+            return self.children[0].Evaluate(ST)
         else:
-            return -self.children[0].Evaluate()
+            return -self.children[0].Evaluate(ST)
 
 class BinOP(Node):
-    def Evaluate(self):
+    def Evaluate(self,ST):
         if (self.value=="+"):
-            return int(self.children[0].Evaluate()) + int(self.children[1].Evaluate())
+            return int(self.children[0].Evaluate(ST)) + int(self.children[1].Evaluate(ST))
         if (self.value=="-"):
-            return int(self.children[0].Evaluate()) - int(self.children[1].Evaluate())
+            return int(self.children[0].Evaluate(ST)) - int(self.children[1].Evaluate(ST))
         if (self.value=="*"):
-            return int(self.children[0].Evaluate()) * int(self.children[1].Evaluate())
+            return int(self.children[0].Evaluate(ST)) * int(self.children[1].Evaluate(ST))
         if (self.value=="/"):
-            return int(self.children[0].Evaluate()) // int(self.children[1].Evaluate())
+            return int(self.children[0].Evaluate(ST)) // int(self.children[1].Evaluate(ST))
+
+class Assign(Node):
+    def Evaluate(self, ST):
+        expression = self.children[1].Evaluate(ST)
+        name = self.children[0].value
+        ST.setter(name, expression)
+
+class Identifier(Node):
+    def Evaluate(self, ST):
+        return ST.getter(self.value)
+
+class Println(Node):
+    def Evaluate(self, ST):
+        print_value = self.children[0].Evaluate(ST)
+        print(print_value)
+
+class Comandos(Node):
+    def Evaluate(self, ST):
+        for x in self.children:
+            x.Evaluate(ST)
 
 
 
@@ -62,6 +102,7 @@ class PrePro():
     @staticmethod
     def filter(code):
         stringWNComents = re.sub(re.compile("/\*([^*]|[\r\n]|(\*+([^*/]|[\r\n])))*\*+/",re.DOTALL ) ,"" ,code)
+        stringWNComents = stringWNComents.replace('\n','')
         return stringWNComents
 
 class Tokenizer:
@@ -72,7 +113,6 @@ class Tokenizer:
 
   def selectNext(self):
         #se for o ultimo acaba
-        teveEspaco = 0
         if (self.position >= len(self.origin)):
             self.actual = Token(tToken= "END")
             return self.actual
@@ -84,8 +124,6 @@ class Tokenizer:
                 if (self.position >= len(self.origin)):
                     self.actual = Token(tToken= "END")
                     return self.actual
-
-
             #Aqui achou o proximo token valido.
         
             self.actual = Token(tToken= tToken_finder(self.origin[self.position]),value = self.origin[self.position])
@@ -97,7 +135,17 @@ class Tokenizer:
                     self.position += 1
                     if(self.position == len(self.origin)):
                         break
-           
+
+
+            if((self.position < len(self.origin)) and self.actual.type == "IDENT"):
+                    while(tToken_finder(self.origin[self.position]) == "IDENT"):
+                        self.actual.value += self.origin[self.position]
+                        self.position += 1
+                        if(self.position == len(self.origin)):
+                            break
+            
+            if(self.actual.value == "println"):
+                self.actual.type = "PRINT"
         return self.actual
 
         
@@ -109,7 +157,6 @@ class Parser():
 
     @staticmethod
     def parseFactor():
-
         Parser.tokens.selectNext()
         res = 0
         if(Parser.tokens.actual.type == "NUM"):
@@ -117,7 +164,11 @@ class Parser():
             node = IntVal(res)
             Parser.tokens.selectNext()
             return node
-
+        if(Parser.tokens.actual.type== "IDENT"):
+            node = Identifier()
+            node.value= Parser.tokens.actual.value
+            Parser.tokens.selectNext()
+            return node
         elif(Parser.tokens.actual.type == "SUM" or Parser.tokens.actual.type == "MIN"):
             if(Parser.tokens.actual.type == "SUM"):
                 node = UnOp("+", [])
@@ -133,8 +184,6 @@ class Parser():
                 raise Exception ("Parenteses não fechados")
             Parser.tokens.selectNext()
             return res
-
-
         else:
             raise Exception ("Factor error")    
 
@@ -142,7 +191,6 @@ class Parser():
     @staticmethod
     def parseExpression():
         res = Parser.parseTerm()
-
         while(Parser.tokens.actual.type == "SUM" or Parser.tokens.actual.type == "MIN"):
             if (Parser.tokens.actual.type == "SUM"):
                 node = BinOP("+",[])
@@ -173,7 +221,52 @@ class Parser():
 
         return res
 
+    @staticmethod
+    def parseBlock():
+        Parser.tokens.selectNext()
+        if Parser.tokens.actual.type == "IDENT" or Parser.tokens.actual.type == "PRINT":
+            commands = Comandos()
+            commands.children.append(Parser.parseCommand())
+            
+            while(Parser.tokens.actual.type == "ENDCOM"):
+                Parser.tokens.selectNext()
+                if(Parser.tokens.actual.type != "END"):
+                    commands.children.append(Parser.parseCommand())
+            return commands
+        else:
 
+            raise Exception("BLOCK ERROR")
+
+    @staticmethod
+    def parseCommand():
+        if Parser.tokens.actual.type == "IDENT":
+            var_name = Parser.tokens.actual.value
+            var_node = Identifier(var_name, [])
+
+            Parser.tokens.selectNext()
+
+            if Parser.tokens.actual.type == "EQL":
+                assign = Assign("=", [])
+                assign.children.append(var_node)
+                value = Parser.parseExpression()
+                assign.children.append(value)
+                if Parser.tokens.actual.type != "ENDCOM":
+                    raise Exception("; NOT FOUND")
+            
+            else:
+                raise Exception("COMMAND ERROR")
+            
+            return assign
+        
+        elif Parser.tokens.actual.type == "PRINT":
+            print_node = Println("PRINT", [])
+            print_value = Parser.parseExpression()
+            print_node.children.append(print_value)
+            if Parser.tokens.actual.type != "ENDCOM":
+                raise Exception("; NOT FOUND")
+            return print_node
+        else:
+            pass
 
         
     @staticmethod
@@ -182,7 +275,7 @@ class Parser():
         code = PrePro().filter(code)
         #executa o compilador
         Parser.tokens = Parser().tokens(origin = code) 
-        res =  Parser().parseExpression()
+        res =  Parser().parseBlock()
         if(Parser.tokens.actual.type != "END"):
             raise Exception ("ERROR")
         return res
@@ -198,9 +291,9 @@ def main():
     f = open(file,'r')
     comando = f.read()
     resultado = Parser().run(comando)
-    resultado = resultado.Evaluate()
-
-    print(resultado)
+    ST = SymbolTable()
+    resultado.Evaluate(ST)
+    # print(ST.sym)
 
 if __name__ == "__main__":
     main()
