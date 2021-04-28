@@ -24,7 +24,7 @@ def tToken_finder(char):
         elif(char.isdigit()):
             return "NUM"
         else:
-            raise Exception("Char not known")
+            return "?"
 
 class SymbolTable:
 
