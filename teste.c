@@ -1,3 +1,4 @@
-xdads= 55;
-O = 55*2;
-println(O + xdads);
+x1 = 3; /* bla bla $x1 = 9999998 */
+y2 = 4;
+z_final = x1 + y2 *33;
+println(z_final);

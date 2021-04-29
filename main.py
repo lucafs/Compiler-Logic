@@ -19,6 +19,10 @@ def tToken_finder(char):
             return "EQL"
         elif(char == ";"):
             return "ENDCOM"
+#Temporario
+        elif(char == "-" or char == "_"):
+            return "IDENT"
+#Aqui
         elif(char.isalpha()):
             return "IDENT"
         elif(char.isdigit()):
@@ -138,12 +142,19 @@ class Tokenizer:
 
 
             if((self.position < len(self.origin)) and self.actual.type == "IDENT"):
-                    while(tToken_finder(self.origin[self.position]) == "IDENT"):
-                        self.actual.value += self.origin[self.position]
-                        self.position += 1
-                        if(self.position == len(self.origin)):
-                            break
-            
+                while(tToken_finder(self.origin[self.position]) == "IDENT" or tToken_finder(self.origin[self.position]) == "NUM"):
+                    self.actual.value += self.origin[self.position]
+                    self.position += 1
+                    if(self.position == len(self.origin)):
+                        break
+
+            if((self.position < len(self.origin)) and self.actual.type == "ENDCOM"):
+                while(tToken_finder(self.origin[self.position]) == "ENDCOM"):
+                    self.actual.value += self.origin[self.position]
+                    self.position += 1
+                    if(self.position == len(self.origin)):
+                        break
+
             if(self.actual.value == "println"):
                 self.actual.type = "PRINT"
         return self.actual
@@ -254,6 +265,7 @@ class Parser():
                     raise Exception("; NOT FOUND")
             
             else:
+                print(Parser.tokens.actual.value)
                 raise Exception("COMMAND ERROR")
             
             return assign
