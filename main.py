@@ -90,6 +90,11 @@ class Println(Node):
         print_value = self.children[0].Evaluate(ST)
         print(print_value)
 
+class ReadLn(Node):
+    def Evaluate(self, st):
+        return int(input())
+
+
 class Comandos(Node):
     def Evaluate(self, ST):
         for x in self.children:
@@ -157,6 +162,8 @@ class Tokenizer:
 
             if(self.actual.value == "println"):
                 self.actual.type = "PRINT"
+            elif(self.actual.value == "readln"):
+                self.actual.type = "READ"
         return self.actual
 
         
@@ -195,6 +202,19 @@ class Parser():
                 raise Exception ("Parenteses não fechados")
             Parser.tokens.selectNext()
             return res
+        elif(Parser.tokens.actual.type == "READ"):
+            node = ReadLn("READ", [])
+            Parser.tokens.selectNext()
+            if(Parser.tokens.actual.type == "OPN"):
+                Parser.tokens.selectNext()
+                if(Parser.tokens.actual.type == "CLS"):
+                    Parser.tokens.selectNext()
+                else:
+                    raise Exception("Read error")
+            else:
+                raise Exception("Read error")
+            return node
+
         else:
             raise Exception ("Factor error")    
 
