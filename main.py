@@ -193,6 +193,8 @@ class Tokenizer:
                 while(tToken_finder(self.origin[self.position]) == "IDENT" or tToken_finder(self.origin[self.position]) == "NUM"):
                     self.actual.value += self.origin[self.position]
                     self.position += 1
+                    if(self.actual.value == "else"):
+                        break
                     if(self.position == len(self.origin)):
                         break
 
@@ -377,10 +379,6 @@ class Parser():
             Parser.tokens.selectNext()
             while(Parser.tokens.actual.type != "CLS_COM"):
                 commands.children.append(Parser.parseCommand())
-                if(Parser.tokens.actual.type != "ENDCOM"):
-                    print(Parser.tokens.actual.type)
-                    raise Exception("; not found")
-                Parser.tokens.selectNext()
             if(Parser.tokens.actual.type == "CLS_COM"):
                 Parser.tokens.selectNext()
             else:
@@ -405,8 +403,8 @@ class Parser():
                 assign.children.append(value)
                 if Parser.tokens.actual.type != "ENDCOM":
                     raise Exception("; NOT FOUND")
+                Parser.tokens.selectNext()
             else:
-                print(Parser.tokens.actual.value)
                 raise Exception("COMMAND ERROR")
             
             return assign
@@ -418,6 +416,7 @@ class Parser():
             print_node.children.append(print_value)
             if Parser.tokens.actual.type != "ENDCOM":
                 raise Exception("; NOT FOUND")
+            Parser.tokens.selectNext()
             return print_node
         
         elif Parser.tokens.actual.type == "WHILE":
@@ -428,10 +427,7 @@ class Parser():
                 while_node.children.append(Parser.parseOrexPR())
                 if Parser.tokens.actual.type == 'CLS':
                     Parser.tokens.selectNext()
-                    if Parser.tokens.actual.type == 'ENDCOM':
-                        while_node = NoOp()
-                    else:
-                        while_node.children.append(Parser.parseCommand())
+                    while_node.children.append(Parser.parseCommand())
                 else:
                     raise Exception("WHILE ERROR")
             else:
@@ -445,19 +441,19 @@ class Parser():
                 if_node.children.append(Parser.parseOrexPR())
                 if Parser.tokens.actual.type == 'CLS':
                     Parser.tokens.selectNext()
-                    if Parser.tokens.actual.type == 'ENDCOM':
-                        if_node.children.append(NoOp())
-                    else:
-                        if_node.children.append(Parser.parseCommand())
+                    if_node.children.append(Parser.parseCommand())
                     if Parser.tokens.actual.type == "ELSE":
-                        print("salve")    
+                        Parser.tokens.selectNext()
+                        if_node.children.append(Parser.parseCommand())
                 else:
                     raise Exception("IF ERROR")
             else:
                 raise Exception("IF ERROR")
-            
+            return if_node  
+        elif Parser.tokens.actual.type == "ENDCOM":
+            return NoOp()
         else:
-            pass
+            Parser.parseBlock()
 
         
     @staticmethod
