@@ -125,7 +125,6 @@ class WhileOp(Node):
         
     
 class IfOp(Node):
-
     def Evaluate(self, st):
         if (self.children[0].Evaluate(st)):
             self.children[1].Evaluate(st) 
@@ -229,6 +228,8 @@ class Tokenizer:
                 self.actual.type = "READ"
             elif(self.actual.value == "if"):
                 self.actual.type = "IF"
+            elif(self.actual.value == "else"):
+                self.actual.type = "ELSE"                
             elif(self.actual.value == "while"):
                 self.actual.type = "WHILE"
         return self.actual
@@ -424,11 +425,13 @@ class Parser():
             Parser.tokens.selectNext()
           
             if Parser.tokens.actual.type == 'OPN':
-                Parser.tokens.selectNext()
                 while_node.children.append(Parser.parseOrexPR())
                 if Parser.tokens.actual.type == 'CLS':
                     Parser.tokens.selectNext()
-                    while_node.children.append(Parser.parseCommand())
+                    if Parser.tokens.actual.type == 'ENDCOM':
+                        while_node = NoOp()
+                    else:
+                        while_node.children.append(Parser.parseCommand())
                 else:
                     raise Exception("WHILE ERROR")
             else:
@@ -436,7 +439,23 @@ class Parser():
             return while_node
         
         elif Parser.tokens.actual.type == "IF":
-            pass
+            if_node = IfOp("if",[])
+            Parser.tokens.selectNext()
+            if Parser.tokens.actual.type == 'OPN':
+                if_node.children.append(Parser.parseOrexPR())
+                if Parser.tokens.actual.type == 'CLS':
+                    Parser.tokens.selectNext()
+                    if Parser.tokens.actual.type == 'ENDCOM':
+                        if_node.children.append(NoOp())
+                    else:
+                        if_node.children.append(Parser.parseCommand())
+                    if Parser.tokens.actual.type == "ELSE":
+                        print("salve")    
+                else:
+                    raise Exception("IF ERROR")
+            else:
+                raise Exception("IF ERROR")
+            
         else:
             pass
 
