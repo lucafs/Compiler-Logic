@@ -15,15 +15,23 @@ def tToken_finder(char):
             return "OPN"
         elif(char == ")"):
             return "CLS"
+        elif(char == "{"):
+            return "OPN_COM"
+        elif(char == "}"):
+            return "CLS_COM"                    
         elif(char == "="):
             return "EQL"
         elif(char == ";"):
             return "ENDCOM"
-#Temporario
-        elif(char == "-" or char == "_"):
-            return "IDENT"
-#Aqui
-        elif(char.isalpha()):
+        elif(char == ">"):
+            return "GREATER"
+        elif(char == "<"):
+            return "LESS"
+        elif(char == "&"):
+            return "AND"
+        elif(char == "│"):
+            return "OR"   
+        elif(char.isalpha() or char == "-" or char == "_"):
             return "IDENT"
         elif(char.isdigit()):
             return "NUM"
@@ -90,10 +98,52 @@ class Println(Node):
         print_value = self.children[0].Evaluate(ST)
         print(print_value)
 
+class ReadLn(Node):
+    def Evaluate(self, st):
+        return int(input())
+
+class LogOp(Node):
+
+    def Evaluate(self, st):
+        if self.value == "<":
+            return self.children[0].Evaluate(st) < self.children[1].Evaluate(st)
+        elif self.value == ">":
+            return self.children[0].Evaluate(st) > self.children[1].Evaluate(st)
+        elif self.value == "==":
+            return self.children[0].Evaluate(st) == self.children[1].Evaluate(st)
+        elif self.value == "&&":
+            return self.children[0].Evaluate(st) or self.children[1].Evaluate(st)
+        elif self.value == "││":
+            return self.children[0].Evaluate(st) and self.children[1].Evaluate(st)
+
+
+class WhileOp(Node):
+
+    def Evaluate(self, st):  
+        while (self.children[0].Evaluate(st)):
+            self.children[1].Evaluate(st)
+        
+    
+class IfOp(Node):
+    def Evaluate(self, st):
+        if (self.children[0].Evaluate(st)):
+            self.children[1].Evaluate(st) 
+        else:
+            if len(self.children) > 2:
+                self.children[2].Evaluate(st)
+
+
+
 class Comandos(Node):
     def Evaluate(self, ST):
         for x in self.children:
             x.Evaluate(ST)
+
+
+
+
+
+
 
 
 
@@ -139,12 +189,12 @@ class Tokenizer:
                     self.position += 1
                     if(self.position == len(self.origin)):
                         break
-
-
             if((self.position < len(self.origin)) and self.actual.type == "IDENT"):
                 while(tToken_finder(self.origin[self.position]) == "IDENT" or tToken_finder(self.origin[self.position]) == "NUM"):
                     self.actual.value += self.origin[self.position]
                     self.position += 1
+                    if(self.actual.value == "else"):
+                        break
                     if(self.position == len(self.origin)):
                         break
 
@@ -154,9 +204,36 @@ class Tokenizer:
                     self.position += 1
                     if(self.position == len(self.origin)):
                         break
+            if((self.position < len(self.origin)) and self.actual.type == "EQL"):
+                if(tToken_finder(self.origin[self.position]) == "EQL"):
+                    self.actual.value += self.origin[self.position]
+                    self.actual.type = "DUALEQL"
+                    self.position +=1
+
+            if(self.actual.type == "OR"):
+                if(tToken_finder(self.origin[self.position]) != "OR"):
+                    raise Exception("OR INCOMPLETE")
+                self.position +=1
+                self.actual.value += self.origin[self.position]
+
+            if(self.actual.type == "AND"):
+                if(tToken_finder(self.origin[self.position]) != "AND"):
+                    raise Exception("AND INCOMPLETE")
+                self.position +=1
+                self.actual.value += self.origin[self.position]
+
+
 
             if(self.actual.value == "println"):
                 self.actual.type = "PRINT"
+            elif(self.actual.value == "readln"):
+                self.actual.type = "READ"
+            elif(self.actual.value == "if"):
+                self.actual.type = "IF"
+            elif(self.actual.value == "else"):
+                self.actual.type = "ELSE"                
+            elif(self.actual.value == "while"):
+                self.actual.type = "WHILE"
         return self.actual
 
         
@@ -167,37 +244,54 @@ class Parser():
         self.tokens = Tokenizer
 
     @staticmethod
-    def parseFactor():
-        Parser.tokens.selectNext()
-        res = 0
-        if(Parser.tokens.actual.type == "NUM"):
-            res = Parser.tokens.actual.value
-            node = IntVal(res)
-            Parser.tokens.selectNext()
-            return node
-        if(Parser.tokens.actual.type== "IDENT"):
-            node = Identifier()
-            node.value= Parser.tokens.actual.value
-            Parser.tokens.selectNext()
-            return node
-        elif(Parser.tokens.actual.type == "SUM" or Parser.tokens.actual.type == "MIN"):
-            if(Parser.tokens.actual.type == "SUM"):
-                node = UnOp("+", [])
-                node.children.append(Parser.parseFactor())    
-                return node            
-            elif(Parser.tokens.actual.type == "MIN"):
-                node = UnOp("-", [])
-                node.children.append(Parser.parseFactor())   
-                return node
-        elif(Parser.tokens.actual.type == "OPN"):
-            res = Parser.parseExpression()
-            if(Parser.tokens.actual.type != "CLS"):
-                raise Exception ("Parenteses não fechados")
-            Parser.tokens.selectNext()
-            return res
-        else:
-            raise Exception ("Factor error")    
+    def parseOrexPR():
+        res = Parser.parseAndexPR()
+        while(Parser.tokens.actual.type == "OR"):
+            node = LogOp("││",[])
+            node.children.append(res)
+            node.children.append(Parser.parseAndexPR())
+            res = node
 
+        return res
+
+    @staticmethod
+    def parseAndexPR():
+        res = Parser.parseEqePR()
+        while(Parser.tokens.actual.type == "AND"):
+            node = LogOp("&&",[])
+            node.children.append(res)
+            node.children.append(Parser.parseEqePR())
+            res = node
+
+        return res
+
+    @staticmethod
+    def parseEqePR():
+        res = Parser.parseRelexPR()
+        while(Parser.tokens.actual.type == "DUALEQL"):
+            node = LogOp("==",[])
+            node.children.append(res)
+            node.children.append(Parser.parseRelexPR())
+            res = node
+
+        return res
+
+
+    @staticmethod
+    def parseRelexPR():
+        res = Parser.parseExpression()
+        while(Parser.tokens.actual.type == "GREATER" or Parser.tokens.actual.type == "LESS"):
+            if(Parser.tokens.actual.type == "GREATER"):
+                node = LogOp(">",[])
+                node.children.append(res)
+                node.children.append(Parser.parseExpression())
+            elif(Parser.tokens.actual.type == "LESS"):
+                node = LogOp("<",[])
+                node.children.append(res)
+                node.children.append(Parser.parseExpression())
+            res = node
+
+        return res
 
     @staticmethod
     def parseExpression():
@@ -233,20 +327,66 @@ class Parser():
         return res
 
     @staticmethod
+    def parseFactor():
+        Parser.tokens.selectNext()
+        res = 0
+        if(Parser.tokens.actual.type == "NUM"):
+            res = Parser.tokens.actual.value
+            node = IntVal(res)
+            Parser.tokens.selectNext()
+            return node
+        elif(Parser.tokens.actual.type== "IDENT"):
+            node = Identifier()
+            node.value= Parser.tokens.actual.value
+            Parser.tokens.selectNext()
+            return node
+        elif(Parser.tokens.actual.type == "SUM" or Parser.tokens.actual.type == "MIN"):
+            if(Parser.tokens.actual.type == "SUM"):
+                node = UnOp("+", [])
+                node.children.append(Parser.parseFactor())    
+                return node            
+            elif(Parser.tokens.actual.type == "MIN"):
+                node = UnOp("-", [])
+                node.children.append(Parser.parseFactor())   
+                return node
+        elif(Parser.tokens.actual.type == "OPN"):
+            res = Parser.parseOrexPR()
+            if(Parser.tokens.actual.type != "CLS"):
+                raise Exception ("Parenteses não fechados")
+            Parser.tokens.selectNext()
+            return res
+        elif(Parser.tokens.actual.type == "READ"):
+            node = ReadLn("READ", [])
+            Parser.tokens.selectNext()
+            if(Parser.tokens.actual.type == "OPN"):
+                Parser.tokens.selectNext()
+                if(Parser.tokens.actual.type == "CLS"):
+                    Parser.tokens.selectNext()
+                else:
+                    raise Exception("Read error")
+            else:
+                raise Exception("Read error")
+            return node 
+        else:
+            raise Exception ("Factor error")    
+
+
+    @staticmethod
     def parseBlock():
         Parser.tokens.selectNext()
-        if Parser.tokens.actual.type == "IDENT" or Parser.tokens.actual.type == "PRINT":
+        if Parser.tokens.actual.type == "OPN_COM":
             commands = Comandos()
-            commands.children.append(Parser.parseCommand())
-            
-            while(Parser.tokens.actual.type == "ENDCOM"):
+            Parser.tokens.selectNext()
+            while(Parser.tokens.actual.type != "CLS_COM"):
+                commands.children.append(Parser.parseCommand())
+            if(Parser.tokens.actual.type == "CLS_COM"):
                 Parser.tokens.selectNext()
-                if(Parser.tokens.actual.type != "END"):
-                    commands.children.append(Parser.parseCommand())
+            else:
+                raise Exception("} not found")
             return commands
         else:
 
-            raise Exception("BLOCK ERROR")
+            raise Exception("{ not found")
 
     @staticmethod
     def parseCommand():
@@ -259,26 +399,61 @@ class Parser():
             if Parser.tokens.actual.type == "EQL":
                 assign = Assign("=", [])
                 assign.children.append(var_node)
-                value = Parser.parseExpression()
+                value = Parser.parseOrexPR()
                 assign.children.append(value)
                 if Parser.tokens.actual.type != "ENDCOM":
                     raise Exception("; NOT FOUND")
-            
+                Parser.tokens.selectNext()
             else:
-                print(Parser.tokens.actual.value)
                 raise Exception("COMMAND ERROR")
             
             return assign
         
+
         elif Parser.tokens.actual.type == "PRINT":
             print_node = Println("PRINT", [])
-            print_value = Parser.parseExpression()
+            print_value = Parser.parseOrexPR()
             print_node.children.append(print_value)
             if Parser.tokens.actual.type != "ENDCOM":
                 raise Exception("; NOT FOUND")
+            Parser.tokens.selectNext()
             return print_node
+        
+        elif Parser.tokens.actual.type == "WHILE":
+            while_node = WhileOp('while', [])
+            Parser.tokens.selectNext()
+          
+            if Parser.tokens.actual.type == 'OPN':
+                while_node.children.append(Parser.parseOrexPR())
+                if Parser.tokens.actual.type == 'CLS':
+                    Parser.tokens.selectNext()
+                    while_node.children.append(Parser.parseCommand())
+                else:
+                    raise Exception("WHILE ERROR")
+            else:
+                raise Exception("WHILE ERROR")
+            return while_node
+        
+        elif Parser.tokens.actual.type == "IF":
+            if_node = IfOp("if",[])
+            Parser.tokens.selectNext()
+            if Parser.tokens.actual.type == 'OPN':
+                if_node.children.append(Parser.parseOrexPR())
+                if Parser.tokens.actual.type == 'CLS':
+                    Parser.tokens.selectNext()
+                    if_node.children.append(Parser.parseCommand())
+                    if Parser.tokens.actual.type == "ELSE":
+                        Parser.tokens.selectNext()
+                        if_node.children.append(Parser.parseCommand())
+                else:
+                    raise Exception("IF ERROR")
+            else:
+                raise Exception("IF ERROR")
+            return if_node  
+        elif Parser.tokens.actual.type == "ENDCOM":
+            return NoOp()
         else:
-            pass
+            Parser.parseBlock()
 
         
     @staticmethod
@@ -305,7 +480,6 @@ def main():
     resultado = Parser().run(comando)
     ST = SymbolTable()
     resultado.Evaluate(ST)
-    # print(ST.sym)
 
 if __name__ == "__main__":
     main()
