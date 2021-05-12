@@ -31,7 +31,7 @@ def tToken_finder(char):
             return "NEG"
         elif(char == "&"):
             return "AND"
-        elif(char == "│"):
+        elif(char == "|"):
             return "OR"   
         elif(char.isalpha() or char == "-" or char == "_"):
             return "IDENT"
@@ -128,11 +128,11 @@ class LogOp(Node):
         elif self.value == "==":
             return self.children[0].Evaluate(ST) == self.children[1].Evaluate(ST)
         elif self.value == "&&":
-            return self.children[0].Evaluate(ST) or self.children[1].Evaluate(ST)
+            return self.children[0].Evaluate(ST) and self.children[1].Evaluate(ST)
         elif self.value == "!":
             return not self.children[0].Evaluate(ST)
-        elif self.value == "││":
-            return self.children[0].Evaluate(ST) and self.children[1].Evaluate(ST)
+        elif self.value == "||":
+            return self.children[0].Evaluate(ST) or self.children[1].Evaluate(ST)
 
 
 class WhileOp(Node):
@@ -257,7 +257,7 @@ class Parser():
     def parseOrexPR():
         res = Parser.parseAndexPR()
         while(Parser.tokens.actual.type == "OR"):
-            node = LogOp("││",[])
+            node = LogOp("||",[])
             node.children.append(res)
             node.children.append(Parser.parseAndexPR())
             res = node
