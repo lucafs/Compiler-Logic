@@ -27,9 +27,11 @@ def tToken_finder(char):
             return "GREATER"
         elif(char == "<"):
             return "LESS"
+        elif(char == "!"):
+            return "NEG"
         elif(char == "&"):
             return "AND"
-        elif(char == "│"):
+        elif(char == "|"):
             return "OR"   
         elif(char.isalpha() or char == "-" or char == "_"):
             return "IDENT"
@@ -37,6 +39,20 @@ def tToken_finder(char):
             return "NUM"
         else:
             return "?"
+
+
+def IdentType(char):
+    if(char == "println"):
+        return "PRINT"
+    elif(char == "readln"):
+        return "READ"
+    elif(char == "if"):
+        return "IF"
+    elif(char == "else"):
+        return "ELSE"                
+    elif(char == "while"):
+        return "WHILE"
+
 
 class SymbolTable:
 
@@ -99,38 +115,40 @@ class Println(Node):
         print(print_value)
 
 class ReadLn(Node):
-    def Evaluate(self, st):
+    def Evaluate(self, ST):
         return int(input())
 
 class LogOp(Node):
 
-    def Evaluate(self, st):
+    def Evaluate(self, ST):
         if self.value == "<":
-            return self.children[0].Evaluate(st) < self.children[1].Evaluate(st)
+            return self.children[0].Evaluate(ST) < self.children[1].Evaluate(ST)
         elif self.value == ">":
-            return self.children[0].Evaluate(st) > self.children[1].Evaluate(st)
+            return self.children[0].Evaluate(ST) > self.children[1].Evaluate(ST)
         elif self.value == "==":
-            return self.children[0].Evaluate(st) == self.children[1].Evaluate(st)
+            return self.children[0].Evaluate(ST) == self.children[1].Evaluate(ST)
         elif self.value == "&&":
-            return self.children[0].Evaluate(st) or self.children[1].Evaluate(st)
-        elif self.value == "││":
-            return self.children[0].Evaluate(st) and self.children[1].Evaluate(st)
+            return self.children[0].Evaluate(ST) and self.children[1].Evaluate(ST)
+        elif self.value == "!":
+            return not self.children[0].Evaluate(ST)
+        elif self.value == "||":
+            return self.children[0].Evaluate(ST) or self.children[1].Evaluate(ST)
 
 
 class WhileOp(Node):
 
-    def Evaluate(self, st):  
-        while (self.children[0].Evaluate(st)):
-            self.children[1].Evaluate(st)
+    def Evaluate(self, ST):  
+        while (self.children[0].Evaluate(ST)):
+            self.children[1].Evaluate(ST)
         
     
 class IfOp(Node):
-    def Evaluate(self, st):
-        if (self.children[0].Evaluate(st)):
-            self.children[1].Evaluate(st) 
+    def Evaluate(self, ST):
+        if (self.children[0].Evaluate(ST)):
+            self.children[1].Evaluate(ST) 
         else:
             if len(self.children) > 2:
-                self.children[2].Evaluate(st)
+                self.children[2].Evaluate(ST)
 
 
 
@@ -197,6 +215,10 @@ class Tokenizer:
                         break
                     if(self.position == len(self.origin)):
                         break
+                identT = IdentType(self.actual.value)
+                if(identT != None):
+                    self.actual.type = identT
+
 
             if((self.position < len(self.origin)) and self.actual.type == "ENDCOM"):
                 while(tToken_finder(self.origin[self.position]) == "ENDCOM"):
@@ -222,18 +244,6 @@ class Tokenizer:
                 self.position +=1
                 self.actual.value += self.origin[self.position]
 
-
-
-            if(self.actual.value == "println"):
-                self.actual.type = "PRINT"
-            elif(self.actual.value == "readln"):
-                self.actual.type = "READ"
-            elif(self.actual.value == "if"):
-                self.actual.type = "IF"
-            elif(self.actual.value == "else"):
-                self.actual.type = "ELSE"                
-            elif(self.actual.value == "while"):
-                self.actual.type = "WHILE"
         return self.actual
 
         
@@ -247,7 +257,7 @@ class Parser():
     def parseOrexPR():
         res = Parser.parseAndexPR()
         while(Parser.tokens.actual.type == "OR"):
-            node = LogOp("││",[])
+            node = LogOp("||",[])
             node.children.append(res)
             node.children.append(Parser.parseAndexPR())
             res = node
@@ -340,13 +350,17 @@ class Parser():
             node.value= Parser.tokens.actual.value
             Parser.tokens.selectNext()
             return node
-        elif(Parser.tokens.actual.type == "SUM" or Parser.tokens.actual.type == "MIN"):
+        elif(Parser.tokens.actual.type == "SUM" or Parser.tokens.actual.type == "MIN" or Parser.tokens.actual.type == "NEG"):
             if(Parser.tokens.actual.type == "SUM"):
                 node = UnOp("+", [])
                 node.children.append(Parser.parseFactor())    
                 return node            
             elif(Parser.tokens.actual.type == "MIN"):
                 node = UnOp("-", [])
+                node.children.append(Parser.parseFactor())   
+                return node
+            elif(Parser.tokens.actual.type == "NEG"):
+                node = LogOp("!", [])
                 node.children.append(Parser.parseFactor())   
                 return node
         elif(Parser.tokens.actual.type == "OPN"):
@@ -373,7 +387,6 @@ class Parser():
 
     @staticmethod
     def parseBlock():
-        Parser.tokens.selectNext()
         if Parser.tokens.actual.type == "OPN_COM":
             commands = Comandos()
             Parser.tokens.selectNext()
@@ -453,7 +466,7 @@ class Parser():
         elif Parser.tokens.actual.type == "ENDCOM":
             return NoOp()
         else:
-            Parser.parseBlock()
+            return Parser.parseBlock()
 
         
     @staticmethod
@@ -462,6 +475,7 @@ class Parser():
         code = PrePro().filter(code)
         #executa o compilador
         Parser.tokens = Parser().tokens(origin = code) 
+        Parser.tokens.selectNext()
         res =  Parser().parseBlock()
         if(Parser.tokens.actual.type != "END"):
             raise Exception ("ERROR")
