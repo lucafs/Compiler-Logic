@@ -71,7 +71,7 @@ class SymbolTable:
         try:
             return self.sym[name]
         except:
-            raise Exception("Symbol "+name+ " not declared")
+            return "error"
 
 
 class Node():
@@ -126,7 +126,9 @@ class BinOP(Node):
 class FirstAssign(Node):
     def Evaluate(self, ST):
         type = self.children[0]
-        name = self.children[1] 
+        name = self.children[1]
+        if(ST.getter(name) != "error"):
+            raise Exception ("Variable " + name + " aready declared")
         ST.setter(name, None ,type)
 
 class Assign(Node):
@@ -134,8 +136,10 @@ class Assign(Node):
         name = self.children[0].value
         expression = self.children[1].Evaluate(ST)
         type = ST.getter(name)[1]
+        if(type == "error"):
+            raise Exception ("Symbol "+name+ " not declared")
         if(expression[1] != type ):
-            raise Exception("Can't cast this variable")
+            raise Exception("Can't cast the "+ name +" variable")
         ST.setter(name, expression[0],type)
 
 class Identifier(Node):
