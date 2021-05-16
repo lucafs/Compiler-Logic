@@ -1,5 +1,13 @@
 {   
-    if (((1==1) || (1==1) || (1==1)) || ((1==0) && (1==0) && (1==0))){
-        println(1);
+    int x;
+    bool y;
+    bool h;
+    string hu;
+    hu = "dogdog";
+    h = false;
+    y = false;
+    if (h){
+        x = readln();
     }
+    println(hu);
 }

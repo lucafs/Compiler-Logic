@@ -33,6 +33,8 @@ def tToken_finder(char):
             return "AND"
         elif(char == "|"):
             return "OR"   
+        elif(char == '"'):
+            return "STRING"   
         elif(char.isalpha() or char == "-" or char == "_"):
             return "IDENT"
         elif(char.isdigit()):
@@ -52,18 +54,24 @@ def IdentType(char):
         return "ELSE"                
     elif(char == "while"):
         return "WHILE"
-
+    elif(char == "bool" or char == "int" or char == "string"):
+        return "TYPE"
+    elif(char == "true" or char == "false"):
+        return "BOOL"
 
 class SymbolTable:
 
     def __init__(self):
         self.sym = {}
 
-    def setter(self, name, value):
-        self.sym[name] = value
+    def setter(self, name, value, type):
+        self.sym[name] = (value,type)
 
     def getter(self, name):
-        return self.sym[name]
+        try:
+            return self.sym[name]
+        except:
+            return "error"
 
 
 class Node():
@@ -80,30 +88,59 @@ class NoOp(Node):
 
 class IntVal(Node):
     def Evaluate(self,ST):
-        return int(self.value)
+        return (int(self.value),"int")
+
+class BoolVal(Node):
+    def Evaluate(self,ST):
+        if(self.value == "true"):
+            return (True,"bool")
+        else:
+            return (False,"bool")
+
+
+class StringVal(Node):
+    def Evaluate(self,ST):
+        return (self.value,'string')
+
+
 class UnOp(Node):
     def Evaluate(self,ST):
         if self.value == '+':
-            return self.children[0].Evaluate(ST)
+            return (self.children[0].Evaluate(ST)[0],"int")
         else:
-            return -self.children[0].Evaluate(ST)
+            return (-self.children[0].Evaluate(ST)[0],"int")
 
 class BinOP(Node):
     def Evaluate(self,ST):
+        if(self.children[0].Evaluate(ST)[1] == "string" or self.children[0].Evaluate(ST)[1] == "string"):
+            raise Exception ("Can't make Arithmetic Operations with strings")
         if (self.value=="+"):
-            return int(self.children[0].Evaluate(ST)) + int(self.children[1].Evaluate(ST))
+            return (int(self.children[0].Evaluate(ST)[0]) + int(self.children[1].Evaluate(ST)[0]),"int")
         if (self.value=="-"):
-            return int(self.children[0].Evaluate(ST)) - int(self.children[1].Evaluate(ST))
+            return (int(self.children[0].Evaluate(ST)[0]) - int(self.children[1].Evaluate(ST)[0]),"int")
         if (self.value=="*"):
-            return int(self.children[0].Evaluate(ST)) * int(self.children[1].Evaluate(ST))
+            return (int(self.children[0].Evaluate(ST)[0]) * int(self.children[1].Evaluate(ST)[0]),"int")
         if (self.value=="/"):
-            return int(self.children[0].Evaluate(ST)) // int(self.children[1].Evaluate(ST))
+            return (int(self.children[0].Evaluate(ST)[0]) // int(self.children[1].Evaluate(ST)[0]),"int")
+
+class FirstAssign(Node):
+    def Evaluate(self, ST):
+        type = self.children[0]
+        name = self.children[1]
+        if(ST.getter(name) != "error"):
+            raise Exception ("Variable " + name + " aready declared")
+        ST.setter(name, None ,type)
 
 class Assign(Node):
     def Evaluate(self, ST):
-        expression = self.children[1].Evaluate(ST)
         name = self.children[0].value
-        ST.setter(name, expression)
+        expression = self.children[1].Evaluate(ST)
+        type = ST.getter(name)[1]
+        if(type == "error"):
+            raise Exception ("Symbol "+name+ " not declared")
+        if(expression[1] != type ):
+            raise Exception("Can't cast the "+ name +" variable")
+        ST.setter(name, expression[0],type)
 
 class Identifier(Node):
     def Evaluate(self, ST):
@@ -112,40 +149,45 @@ class Identifier(Node):
 class Println(Node):
     def Evaluate(self, ST):
         print_value = self.children[0].Evaluate(ST)
-        print(print_value)
+        if(print_value[1] == "string"):
+            print(print_value[0][1:-1])
+        else:
+            print(print_value[0])
 
 class ReadLn(Node):
     def Evaluate(self, ST):
-        return int(input())
+        return (int(input()),"int")
 
 class LogOp(Node):
 
     def Evaluate(self, ST):
+        if(self.children[0].Evaluate(ST)[1] == "string" or self.children[0].Evaluate(ST)[1] == "string"):
+            raise Exception ("Can't make Boolean Operations with strings")
         if self.value == "<":
-            return self.children[0].Evaluate(ST) < self.children[1].Evaluate(ST)
+            return (self.children[0].Evaluate(ST)[0] < self.children[1].Evaluate(ST)[0],"bool")
         elif self.value == ">":
-            return self.children[0].Evaluate(ST) > self.children[1].Evaluate(ST)
+            return (self.children[0].Evaluate(ST)[0] > self.children[1].Evaluate(ST)[0],"bool")
         elif self.value == "==":
-            return self.children[0].Evaluate(ST) == self.children[1].Evaluate(ST)
+            return (self.children[0].Evaluate(ST)[0] == self.children[1].Evaluate(ST)[0],"bool")
         elif self.value == "&&":
-            return self.children[0].Evaluate(ST) and self.children[1].Evaluate(ST)
-        elif self.value == "!":
-            return not self.children[0].Evaluate(ST)
+            return (self.children[0].Evaluate(ST)[0] and self.children[1].Evaluate(ST)[0],"bool")
         elif self.value == "||":
-            return self.children[0].Evaluate(ST) or self.children[1].Evaluate(ST)
+            return (self.children[0].Evaluate(ST)[0] or self.children[1].Evaluate(ST)[0],"bool")
+        elif self.value == "!":
+            return (not self.children[0].Evaluate(ST)[0],"bool")#Não sei se é o certo 
 
 
 class WhileOp(Node):
 
     def Evaluate(self, ST):  
-        while (self.children[0].Evaluate(ST)):
+        while (self.children[0].Evaluate(ST)[0]):
             self.children[1].Evaluate(ST)
         
     
 class IfOp(Node):
     def Evaluate(self, ST):
-        if (self.children[0].Evaluate(ST)):
-            self.children[1].Evaluate(ST) 
+        if (self.children[0].Evaluate(ST)[0]):
+            self.children[1].Evaluate(ST)
         else:
             if len(self.children) > 2:
                 self.children[2].Evaluate(ST)
@@ -200,13 +242,23 @@ class Tokenizer:
         
             self.actual = Token(tToken= tToken_finder(self.origin[self.position]),value = self.origin[self.position])
             self.position += 1
-
             if((self.position < len(self.origin)) and self.actual.type == "NUM"):
                 while(tToken_finder(self.origin[self.position]) == "NUM"):
                     self.actual.value += self.origin[self.position]
                     self.position += 1
                     if(self.position == len(self.origin)):
                         break
+
+
+            if((self.position < len(self.origin)) and self.actual.type == "STRING"):
+                while(tToken_finder(self.origin[self.position]) != "STRING"):
+                    if(self.position == len(self.origin) or tToken_finder(self.origin[self.position]) == "ENDCOM"):
+                        raise Exception ("ASPAS DE STRING NÃO FECHADAS")
+                    self.actual.value += self.origin[self.position]
+                    self.position += 1
+                self.actual.value += self.origin[self.position]
+                self.position += 1
+
             if((self.position < len(self.origin)) and self.actual.type == "IDENT"):
                 while(tToken_finder(self.origin[self.position]) == "IDENT" or tToken_finder(self.origin[self.position]) == "NUM"):
                     self.actual.value += self.origin[self.position]
@@ -345,6 +397,16 @@ class Parser():
             node = IntVal(res)
             Parser.tokens.selectNext()
             return node
+        elif(Parser.tokens.actual.type == "BOOL"):
+            res = Parser.tokens.actual.value
+            node = BoolVal(res)
+            Parser.tokens.selectNext()
+            return node
+        elif(Parser.tokens.actual.type == "STRING"):
+            res = Parser.tokens.actual.value
+            node = StringVal(res)
+            Parser.tokens.selectNext()
+            return node
         elif(Parser.tokens.actual.type== "IDENT"):
             node = Identifier()
             node.value= Parser.tokens.actual.value
@@ -382,6 +444,7 @@ class Parser():
                 raise Exception("Read error")
             return node 
         else:
+            print(Parser.tokens.actual.value)
             raise Exception ("Factor error")    
 
 
@@ -421,6 +484,22 @@ class Parser():
                 raise Exception("COMMAND ERROR")
             
             return assign
+        
+        elif Parser.tokens.actual.type == "TYPE":
+            firstAssign = FirstAssign("=", [])
+            firstAssign.children.append(Parser.tokens.actual.value)
+            Parser.tokens.selectNext()
+            if(Parser.tokens.actual.type == "IDENT"):
+                firstAssign.children.append(Parser.tokens.actual.value)
+                Parser.tokens.selectNext()
+                if Parser.tokens.actual.type != "ENDCOM":
+                    raise Exception("; NOT FOUND")
+                Parser.tokens.selectNext()
+            else:
+                raise Exception("FIRST ASSIGN ERROR")
+            return firstAssign
+
+
         
 
         elif Parser.tokens.actual.type == "PRINT":
