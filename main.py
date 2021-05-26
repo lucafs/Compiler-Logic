@@ -65,6 +65,11 @@ class SymbolTable:
         self.sym = {}
 
     def setter(self, name, value, type):
+        if(value != None):
+            if(type == "bool"):
+                value = bool(value)
+            elif(type == "int"):
+                value = int(value)
         self.sym[name] = (value,type)
 
     def getter(self, name):
@@ -138,8 +143,11 @@ class Assign(Node):
         type = ST.getter(name)[1]
         if(type == "error"):
             raise Exception ("Symbol "+name+ " not declared")
-        if(expression[1] != type ):
-            raise Exception("Can't cast the "+ name +" variable")
+        if(expression[1] != type):
+            if((expression[1] == "bool" and type == "int") or (expression[1] == "int" and type == "bool")):
+                pass
+            else:
+                raise Exception("Can't cast the "+ name +" variable")
         ST.setter(name, expression[0],type)
 
 class Identifier(Node):
@@ -149,6 +157,8 @@ class Identifier(Node):
 class Println(Node):
     def Evaluate(self, ST):
         print_value = self.children[0].Evaluate(ST)
+        if(print_value == "error"):
+            raise Exception ("Symbol "+self.children[0].value+" not declared")
         if(print_value[1] == "string"):
             print(print_value[0][1:-1])
         else:
@@ -159,10 +169,11 @@ class ReadLn(Node):
         return (int(input()),"int")
 
 class LogOp(Node):
-
-    def Evaluate(self, ST):
-        if(self.children[0].Evaluate(ST)[1] == "string" or self.children[0].Evaluate(ST)[1] == "string"):
-            raise Exception ("Can't make Boolean Operations with strings")
+    def Evaluate(self, ST): 
+        variableType1 = self.children[0].Evaluate(ST)[1]
+        variableType2 = self.children[1].Evaluate(ST)[1]
+        if((variableType1 == "string" and variableType2 != "string") or (variableType1 != "string" and variableType2 == "string")):
+            raise Exception ("Not valid boolean operation")
         if self.value == "<":
             return (self.children[0].Evaluate(ST)[0] < self.children[1].Evaluate(ST)[0],"bool")
         elif self.value == ">":
@@ -170,9 +181,15 @@ class LogOp(Node):
         elif self.value == "==":
             return (self.children[0].Evaluate(ST)[0] == self.children[1].Evaluate(ST)[0],"bool")
         elif self.value == "&&":
-            return (self.children[0].Evaluate(ST)[0] and self.children[1].Evaluate(ST)[0],"bool")
+            if(bool(self.children[0].Evaluate(ST)[0] & self.children[1].Evaluate(ST)[0])):
+                return(True,"bool")
+            else:
+                return (False,"bool")
         elif self.value == "||":
-            return (self.children[0].Evaluate(ST)[0] or self.children[1].Evaluate(ST)[0],"bool")
+            if(self.children[0].Evaluate(ST)[0] | self.children[1].Evaluate(ST)[0]):
+                return (True,"bool")
+            else:
+                return(False,"bool")
         elif self.value == "!":
             return (not self.children[0].Evaluate(ST)[0],"bool")#Não sei se é o certo 
 
@@ -186,6 +203,8 @@ class WhileOp(Node):
     
 class IfOp(Node):
     def Evaluate(self, ST):
+        if(self.children[0].Evaluate(ST)[1] == "string"):
+            raise Exception("Can't use string as condition")
         if (self.children[0].Evaluate(ST)[0]):
             self.children[1].Evaluate(ST)
         else:
@@ -232,7 +251,7 @@ class Tokenizer:
             return self.actual
         if(self.position < len(self.origin)):
             #passa enquanto for espaço
-            while(self.origin[self.position] == " "):
+            while(self.origin[self.position] == " " or self.origin[self.position] == "\t"):
                 self.position += 1
                 #se for o ultimo acaba
                 if (self.position >= len(self.origin)):
@@ -295,7 +314,6 @@ class Tokenizer:
                     raise Exception("AND INCOMPLETE")
                 self.position +=1
                 self.actual.value += self.origin[self.position]
-
         return self.actual
 
         
@@ -444,7 +462,6 @@ class Parser():
                 raise Exception("Read error")
             return node 
         else:
-            print(Parser.tokens.actual.value)
             raise Exception ("Factor error")    
 
 
@@ -461,7 +478,6 @@ class Parser():
                 raise Exception("} not found")
             return commands
         else:
-
             raise Exception("{ not found")
 
     @staticmethod

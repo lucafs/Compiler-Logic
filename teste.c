@@ -1,13 +1,15 @@
-{   
-    int x;
-    bool y;
-    bool h;
-    string hu;
-    hu = "dogdog";
-    h = false;
-    y = false;
-    if (h){
-        x = readln();
+{
+    bool a;
+    int b;
+    int c;
+    
+    b = 32;
+    c = 32;
+    a = true;
+
+    if ((b && c) == a) {
+    	println(1);
+    }else{
+    	println(2);
     }
-    println(hu);
 }
