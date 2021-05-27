@@ -171,9 +171,14 @@ class ReadLn(Node):
 class LogOp(Node):
     def Evaluate(self, ST): 
         variableType1 = self.children[0].Evaluate(ST)[1]
-        variableType2 = self.children[1].Evaluate(ST)[1]
-        if((variableType1 == "string" and variableType2 != "string") or (variableType1 != "string" and variableType2 == "string")):
-            raise Exception ("Not valid boolean operation")
+        try:
+            variableType2 = self.children[1].Evaluate(ST)[1]
+            if((variableType1 == "string" and variableType2 != "string") or (variableType1 != "string" and variableType2 == "string")):
+                raise Exception ("Not valid boolean operation") 
+        except:
+            if(variableType1 == "string" and self.value == "!"):
+                raise Exception ("Not valid ! operation") 
+  
         if self.value == "<":
             return (self.children[0].Evaluate(ST)[0] < self.children[1].Evaluate(ST)[0],"bool")
         elif self.value == ">":
