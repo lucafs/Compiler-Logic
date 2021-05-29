@@ -1,6 +1,116 @@
 import re
 import sys
-from abc import ABC, abstractmethod
+
+
+class Assembly:
+
+    commands = []
+
+    @staticmethod
+    def AddCommand(command):
+        Assembly.commands.append(command)
+
+    @staticmethod
+    def WriteASM(ASMname):
+        commands_list = Assembly.commands
+        final_string = "\n".join(commands_list)
+
+        ASM_code = f'''
+; constantes
+SYS_EXIT equ 1
+SYS_READ equ 3
+SYS_WRITE equ 4
+STDIN equ 0
+STDOUT equ 1
+True equ 1
+False equ 0
+
+segment .data
+
+segment .bss  ; variaveis
+  res RESB 1
+
+section .text
+  global _start
+
+print:  ; subrotina print
+
+  PUSH EBP ; guarda o base pointer
+  MOV EBP, ESP ; estabelece um novo base pointer
+
+  MOV EAX, [EBP+8] ; 1 argumento antes do RET e EBP
+  XOR ESI, ESI
+
+print_dec: ; empilha todos os digitos
+  MOV EDX, 0
+  MOV EBX, 0x000A
+  DIV EBX
+  ADD EDX, '0'
+  PUSH EDX
+  INC ESI ; contador de digitos
+  CMP EAX, 0
+  JZ print_next ; quando acabar pula
+  JMP print_dec
+
+print_next:
+  CMP ESI, 0
+  JZ print_exit ; quando acabar de imprimir
+  DEC ESI
+
+  MOV EAX, SYS_WRITE
+  MOV EBX, STDOUT
+
+  POP ECX
+  MOV [res], ECX
+  MOV ECX, res
+
+  MOV EDX, 1
+  INT 0x80
+  JMP print_next
+
+print_exit:
+  POP EBP
+  RET
+
+; subrotinas if/while
+binop_je:
+  JE binop_true
+  JMP binop_false
+
+binop_jg:
+  JG binop_true
+  JMP binop_false
+
+binop_jl:
+  JL binop_true
+  JMP binop_false
+
+binop_false:
+  MOV EBX, False
+  JMP binop_exit
+binop_true:
+  MOV EBX, True
+binop_exit:
+  RET
+
+_start:
+
+  PUSH EBP ; guarda o base pointer
+  MOV EBP, ESP ; estabelece um novo base pointer
+
+  ; codigo gerado pelo compilador
+{final_string}
+
+  ; interrupcao de saida
+  POP EBP
+  MOV EAX, 1
+  INT 0x80'''
+
+        f = open(ASMname, "w+")
+
+        f.write(ASM_code)
+
+
 
 def tToken_finder(char):
         if (char == "+"):
@@ -32,9 +142,7 @@ def tToken_finder(char):
         elif(char == "&"):
             return "AND"
         elif(char == "|"):
-            return "OR"   
-        elif(char == '"'):
-            return "STRING"   
+            return "OR"     
         elif(char.isalpha() or char == "-" or char == "_"):
             return "IDENT"
         elif(char.isdigit()):
@@ -46,37 +154,49 @@ def tToken_finder(char):
 def IdentType(char):
     if(char == "println"):
         return "PRINT"
-    elif(char == "readln"):
-        return "READ"
     elif(char == "if"):
         return "IF"
     elif(char == "else"):
         return "ELSE"                
     elif(char == "while"):
         return "WHILE"
-    elif(char == "bool" or char == "int" or char == "string"):
+    elif(char == "bool" or char == "int"):
         return "TYPE"
     elif(char == "true" or char == "false"):
         return "BOOL"
+
+
+
+
 
 class SymbolTable:
 
     def __init__(self):
         self.sym = {}
+        self.varNum = 0
+        self.loopNum=0
 
-    def setter(self, name, value, type):
+    def setter(self, name, value, type ,number):
         if(value != None):
             if(type == "bool"):
                 value = bool(value)
             elif(type == "int"):
                 value = int(value)
-        self.sym[name] = (value,type)
+        self.sym[name] = (value,type,number)
 
     def getter(self, name):
         try:
             return self.sym[name]
         except:
             return "error"
+
+    def get_varNum(self):
+        self.varNum+=1
+        return self.varNum     
+           
+    def get_loopNum(self):    
+        self.loopNum +=1
+        return self.loopNum * 4    
 
 
 class Node():
@@ -93,54 +213,71 @@ class NoOp(Node):
 
 class IntVal(Node):
     def Evaluate(self,ST):
+        command = " MOV EBX, {0} ;".format(self.value)
+        Assembly.AddCommand(command)
         return (int(self.value),"int")
 
 class BoolVal(Node):
     def Evaluate(self,ST):
         if(self.value == "true"):
+            command = " MOV EBX, {0} ;".format(True)
+            Assembly.AddCommand(command)
             return (True,"bool")
         else:
+            command = " MOV EBX, {0} ;".format(False)
+            Assembly.AddCommand(command)
             return (False,"bool")
 
-
-class StringVal(Node):
-    def Evaluate(self,ST):
-        return (self.value,'string')
 
 
 class UnOp(Node):
     def Evaluate(self,ST):
+        value = self.children[0].Evaluate(ST)[0]
         if self.value == '+':
-            return (self.children[0].Evaluate(ST)[0],"int")
+            command = " MOV EBX, {0} ;".format(value)
+            Assembly.AddCommand(command)
+            return (value,"int")
         else:
-            return (-self.children[0].Evaluate(ST)[0],"int")
+            command = " MOV EBX, {0} ;".format(-value)
+            Assembly.AddCommand(command)
+            return (-value,"int")
 
 class BinOP(Node):
     def Evaluate(self,ST):
-        if(self.children[0].Evaluate(ST)[1] == "string" or self.children[0].Evaluate(ST)[1] == "string"):
-            raise Exception ("Can't make Arithmetic Operations with strings")
         if (self.value=="+"):
+            command =" POP EAX ;\n ADD EAX, EBX ;\n MOV EBX, EAX ;"
+            Assembly.AddCommand(command)
             return (int(self.children[0].Evaluate(ST)[0]) + int(self.children[1].Evaluate(ST)[0]),"int")
         if (self.value=="-"):
+            command =" POP EAX ;\n SUB EAX, EBX ;\n MOV EBX, EAX ;"
+            Assembly.AddCommand(command)
             return (int(self.children[0].Evaluate(ST)[0]) - int(self.children[1].Evaluate(ST)[0]),"int")
         if (self.value=="*"):
+            command =" POP EAX ;\n IMUL EAX, EBX ;\n MOV EBX, EAX ;"
+            Assembly.AddCommand(command)
             return (int(self.children[0].Evaluate(ST)[0]) * int(self.children[1].Evaluate(ST)[0]),"int")
         if (self.value=="/"):
+            command =" POP EAX ;\n DIV EAX, EBX ;\n MOV EBX, EAX ;"
+            Assembly.AddCommand(command)
             return (int(self.children[0].Evaluate(ST)[0]) // int(self.children[1].Evaluate(ST)[0]),"int")
 
 class FirstAssign(Node):
     def Evaluate(self, ST):
         type = self.children[0]
         name = self.children[1]
+        number =ST.get_varNum()
         if(ST.getter(name) != "error"):
             raise Exception ("Variable " + name + " aready declared")
-        ST.setter(name, None ,type)
+        command = " PUSH DWORD 0 ;\n MOV [EBP-{0}], EBX ".format(number)
+        Assembly.AddCommand(command)
+        ST.setter(name, None ,type,number)
 
 class Assign(Node):
     def Evaluate(self, ST):
         name = self.children[0].value
         expression = self.children[1].Evaluate(ST)
         type = ST.getter(name)[1]
+        number = ST.getter(name)[2]
         if(type == "error"):
             raise Exception ("Symbol "+name+ " not declared")
         if(expression[1] != type):
@@ -148,63 +285,83 @@ class Assign(Node):
                 pass
             else:
                 raise Exception("Can't cast the "+ name +" variable")
-        ST.setter(name, expression[0],type)
+        command = " MOV [EBP-{0}], EBX;".format(number)
+        Assembly.AddCommand(command)
+        ST.setter(name, expression[0],type,number)
 
 class Identifier(Node):
     def Evaluate(self, ST):
-        return ST.getter(self.value)
+        val = ST.getter(self.value)
+        command = ' MOV EBX, [EBP-{0}] ;'.format(val[2])
+        Assembly.AddCommand(command)
+        return val
 
 class Println(Node):
     def Evaluate(self, ST):
         print_value = self.children[0].Evaluate(ST)
         if(print_value == "error"):
             raise Exception ("Symbol "+self.children[0].value+" not declared")
-        if(print_value[1] == "string"):
-            print(print_value[0][1:-1])
         else:
+            command = " PUSH EBX ;\n CALL print ;\n POP EBX ;"
+            Assembly.AddCommand(command)
             print(print_value[0])
 
-class ReadLn(Node):
-    def Evaluate(self, ST):
-        return (int(input()),"int")
 
 class LogOp(Node):
     def Evaluate(self, ST): 
-        variableType1 = self.children[0].Evaluate(ST)[1]
-        variableType2 = self.children[1].Evaluate(ST)[1]
-        if((variableType1 == "string" and variableType2 != "string") or (variableType1 != "string" and variableType2 == "string")):
-            raise Exception ("Not valid boolean operation")
         if self.value == "<":
+            command = " POP EAX \n CMP EAX, EBX\n CALL binop_jl"
+            Assembly.AddCommand(command)
             return (self.children[0].Evaluate(ST)[0] < self.children[1].Evaluate(ST)[0],"bool")
         elif self.value == ">":
+            command = " POP EAX \n CMP EAX, EBX\n CALL binop_jg"
+            Assembly.AddCommand(command)
             return (self.children[0].Evaluate(ST)[0] > self.children[1].Evaluate(ST)[0],"bool")
         elif self.value == "==":
+            command = " POP EAX \n CMP EAX, EBX\n CALL binop_je"
+            Assembly.AddCommand(command)
             return (self.children[0].Evaluate(ST)[0] == self.children[1].Evaluate(ST)[0],"bool")
         elif self.value == "&&":
+            command = " POP EAX \n AND EAX, EBX\n CALL binop_jl"
+            Assembly.AddCommand(command)
             if(bool(self.children[0].Evaluate(ST)[0] & self.children[1].Evaluate(ST)[0])):
                 return(True,"bool")
             else:
                 return (False,"bool")
         elif self.value == "||":
+            command = " POP EAX \n OR EAX, EBX\n CALL binop_jl"
+            Assembly.AddCommand(command)
             if(self.children[0].Evaluate(ST)[0] | self.children[1].Evaluate(ST)[0]):
                 return (True,"bool")
             else:
                 return(False,"bool")
         elif self.value == "!":
-            return (not self.children[0].Evaluate(ST)[0],"bool")#Não sei se é o certo 
+            return (not self.children[0].Evaluate(ST)[0],"bool") 
 
 
 class WhileOp(Node):
 
-    def Evaluate(self, ST):  
+    def Evaluate(self, ST):
+        loopNum = ST.get_loopNum()
+        command = " LOOP_{0}\n CMP EBX, False ;\n JE EXIT_{0};\n JMP LOOP_{0} ;\n EXIT_{0}:".format(loopNum)
+        Assembly.AddCommand(command)
         while (self.children[0].Evaluate(ST)[0]):
             self.children[1].Evaluate(ST)
         
     
 class IfOp(Node):
     def Evaluate(self, ST):
-        if(self.children[0].Evaluate(ST)[1] == "string"):
-            raise Exception("Can't use string as condition")
+        loopNum = ST.get_loopNum()
+        command = " CMP EBX, False ;\n"
+        if len(self.children) > 2:
+            command += " JE ELSE_{0} ;\n".format(loopNum)
+        else:
+            command += " JE EXIT_{0} ;\n".format(loopNum)
+        command += " JMP EXIT_{0} ;\n".format(loopNum)
+        if(len(self.children) > 2):
+            command += ' ELSE_{0} ;\n'.format(loopNum)
+        command += ' EXIT_{0} ;'.format(loopNum)
+        Assembly.AddCommand(command)
         if (self.children[0].Evaluate(ST)[0]):
             self.children[1].Evaluate(ST)
         else:
@@ -267,16 +424,6 @@ class Tokenizer:
                     self.position += 1
                     if(self.position == len(self.origin)):
                         break
-
-
-            if((self.position < len(self.origin)) and self.actual.type == "STRING"):
-                while(tToken_finder(self.origin[self.position]) != "STRING"):
-                    if(self.position == len(self.origin) or tToken_finder(self.origin[self.position]) == "ENDCOM"):
-                        raise Exception ("ASPAS DE STRING NÃO FECHADAS")
-                    self.actual.value += self.origin[self.position]
-                    self.position += 1
-                self.actual.value += self.origin[self.position]
-                self.position += 1
 
             if((self.position < len(self.origin)) and self.actual.type == "IDENT"):
                 while(tToken_finder(self.origin[self.position]) == "IDENT" or tToken_finder(self.origin[self.position]) == "NUM"):
@@ -420,11 +567,6 @@ class Parser():
             node = BoolVal(res)
             Parser.tokens.selectNext()
             return node
-        elif(Parser.tokens.actual.type == "STRING"):
-            res = Parser.tokens.actual.value
-            node = StringVal(res)
-            Parser.tokens.selectNext()
-            return node
         elif(Parser.tokens.actual.type== "IDENT"):
             node = Identifier()
             node.value= Parser.tokens.actual.value
@@ -449,18 +591,6 @@ class Parser():
                 raise Exception ("Parenteses não fechados")
             Parser.tokens.selectNext()
             return res
-        elif(Parser.tokens.actual.type == "READ"):
-            node = ReadLn("READ", [])
-            Parser.tokens.selectNext()
-            if(Parser.tokens.actual.type == "OPN"):
-                Parser.tokens.selectNext()
-                if(Parser.tokens.actual.type == "CLS"):
-                    Parser.tokens.selectNext()
-                else:
-                    raise Exception("Read error")
-            else:
-                raise Exception("Read error")
-            return node 
         else:
             raise Exception ("Factor error")    
 
@@ -589,6 +719,7 @@ def main():
     resultado = Parser().run(comando)
     ST = SymbolTable()
     resultado.Evaluate(ST)
+    Assembly.WriteASM("teste.asm")
 
 if __name__ == "__main__":
     main()
