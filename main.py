@@ -719,7 +719,7 @@ def main():
     resultado = Parser().run(comando)
     ST = SymbolTable()
     resultado.Evaluate(ST)
-    Assembly.WriteASM("teste.asm")
+    Assembly.WriteASM("program.asm")
 
 if __name__ == "__main__":
     main()
