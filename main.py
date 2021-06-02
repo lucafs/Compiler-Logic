@@ -279,7 +279,7 @@ class Assign(Node):
         type = ST.getter(name)[1]
         number = ST.getter(name)[2]
         if(type == "error"):
-            raise Exception ("Symbol "+name+ " not declared")
+            raise Exception ("Symbol "+ name + " not declared")
         if(expression[1] != type):
             if((expression[1] == "bool" and type == "int") or (expression[1] == "int" and type == "bool")):
                 pass
