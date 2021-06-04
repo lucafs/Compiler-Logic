@@ -1,19 +1,16 @@
-/*Ok*/
+/*Error: tipo de retorno*/
 
 int soma(int x, int y)
 {
     int res;
     res = x + y;
-    return res;    
+    return "somei";    
 }
 
 int main()
 {
-    bool res;
-    int x;
-    x = 3;
+    string x;
+    x = soma(3,2);
+    println(x);
     
-    res = soma(x,2) == 8;
-    
-    println(res);
 }

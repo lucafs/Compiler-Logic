@@ -192,7 +192,9 @@ class ReadLn(Node):
 class LogOp(Node):
     def Evaluate(self, ST): 
         variableType1 = self.children[0].Evaluate(ST)[1]
-        variableType2 = self.children[1].Evaluate(ST)[1]
+        variableType2 = ""
+        if self.value != "!":
+            variableType2 = self.children[1].Evaluate(ST)[1]
         if((variableType1 == "string" and variableType2 != "string") or (variableType1 != "string" and variableType2 == "string")):
             raise Exception ("Not valid boolean operation")
         if self.value == "<":
@@ -269,6 +271,8 @@ class FuncCall(Node):
 class ReturnVal(Node):
     def Evaluate(self,ST):
         retValue = self.value.Evaluate(ST)
+        if(retValue[1] == "string"):
+            raise Exception ("Invalid return type")
         ST.firsSet("RETURN__VALUE", retValue[0],retValue[1])
         return self.value.Evaluate(ST)
 
