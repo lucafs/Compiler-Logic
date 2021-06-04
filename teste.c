@@ -1,15 +1,12 @@
-{
-    bool a;
-    int b;
-    int c;
-    
-    b = 32;
-    c = 32;
-    a = true;
 
-    if ((b && c) == a) {
-    	println(1);
-    }else{
-    	println(2);
-    }
+int soma(int numero, int outro){
+    int somaFinal;
+    somaFinal = numero + outro;
+    println(somaFinal);
+    return somaFinal;
+}
+int main(){
+    int somatotal;
+    soma(3,4);
+    println(somatotal);
 }

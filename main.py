@@ -34,7 +34,9 @@ def tToken_finder(char):
         elif(char == "|"):
             return "OR"   
         elif(char == '"'):
-            return "STRING"   
+            return "STRING"
+        elif(char == ","):
+            return "COMMA"   
         elif(char.isalpha() or char == "-" or char == "_"):
             return "IDENT"
         elif(char.isdigit()):
@@ -54,6 +56,8 @@ def IdentType(char):
         return "ELSE"                
     elif(char == "while"):
         return "WHILE"
+    elif(char == "return"):
+        return "RETURN"
     elif(char == "bool" or char == "int" or char == "string"):
         return "TYPE"
     elif(char == "true" or char == "false"):
@@ -62,7 +66,8 @@ def IdentType(char):
 class SymbolTable:
 
     def __init__(self):
-        self.sym = {}
+        self.sym = {} # (value,type)
+        self.functions = {} # (name,value)
 
     def setter(self, name, value, type):
         if(value != None):
@@ -70,14 +75,21 @@ class SymbolTable:
                 value = bool(value)
             elif(type == "int"):
                 value = int(value)
-        self.sym[name] = (value,type)
+            if(type == "FUNCTION"):
+                self.functions[name] = (value)
+            else:
+                self.sym[name] = (value,type)
 
-    def getter(self, name):
+    def getter(self, name, type):
         try:
-            return self.sym[name]
+            if type == "FUNC": 
+                return self.functions[name]
+            else:
+                return self.sym[name]
         except:
             return "error"
-
+    def setFuncs(self,dict):
+        self.functions = dict
 
 class Node():
     def __init__(self,value = None , children = []):
@@ -94,6 +106,7 @@ class NoOp(Node):
 class IntVal(Node):
     def Evaluate(self,ST):
         return (int(self.value),"int")
+
 
 class BoolVal(Node):
     def Evaluate(self,ST):
@@ -132,7 +145,7 @@ class FirstAssign(Node):
     def Evaluate(self, ST):
         type = self.children[0]
         name = self.children[1]
-        if(ST.getter(name) != "error"):
+        if(ST.getter(name," ") != "error"):
             raise Exception ("Variable " + name + " aready declared")
         ST.setter(name, None ,type)
 
@@ -140,7 +153,7 @@ class Assign(Node):
     def Evaluate(self, ST):
         name = self.children[0].value
         expression = self.children[1].Evaluate(ST)
-        type = ST.getter(name)[1]
+        type = ST.getter(name, " ")[1]
         if(type == "error"):
             raise Exception ("Symbol "+name+ " not declared")
         if(expression[1] != type):
@@ -152,7 +165,7 @@ class Assign(Node):
 
 class Identifier(Node):
     def Evaluate(self, ST):
-        return ST.getter(self.value)
+        return ST.getter(self.value, " ")
 
 class Println(Node):
     def Evaluate(self, ST):
@@ -211,18 +224,40 @@ class IfOp(Node):
             if len(self.children) > 2:
                 self.children[2].Evaluate(ST)
 
+class FuncDeclare(Node):
+    def Evaluate(self, ST):
+        funcName = self.value
+        funcList = self.children
+        #ORDEM DA LISTA lista de argumentos (tipo,nome) / argumentos
+        ST.setter(funcName, funcList ,"FUNCTION")
+
+class FuncCall(Node):
+    def Evaluate(self, ST):
+        funcName = self.value
+        funcList = ST.getter(funcName,"FUNC")
+        functionST = SymbolTable()
+        functionST.setFuncs(ST.functions)
+        if(funcList == "error"):
+            raise Exception ("Func not Declared " + funcName)
+        if(len(self.children) != len(funcList[0])):
+            raise Exception ("Not enough args in FuncCall " + funcName)
+        for i in range(len(funcList[0])):
+            print(self.children[0][i])
+            functionST.setter(funcList[0][i][1],self.children[0][i],funcList[0][i][0])
+        funcList[1].Evaluate(functionST)
+
+
+class ReturnVal(Node):
+    def Evaluate(self,ST):
+        retValue = self.value.Evaluate(ST)
+        return ST.getter(retValue, " ")
+
 
 
 class Comandos(Node):
     def Evaluate(self, ST):
         for x in self.children:
             x.Evaluate(ST)
-
-
-
-
-
-
 
 
 
@@ -426,10 +461,29 @@ class Parser():
             Parser.tokens.selectNext()
             return node
         elif(Parser.tokens.actual.type== "IDENT"):
-            node = Identifier()
-            node.value= Parser.tokens.actual.value
-            Parser.tokens.selectNext()
-            return node
+            nodeValue = Parser.tokens.actual.value
+            if Parser.tokens.actual.type != "OPN":
+                node = Identifier()
+                node.value= nodeValue
+                Parser.tokens.selectNext()
+                return node
+            else:
+                assign = FuncCall(nodeValue,[])
+                Parser.tokens.selectNext()
+                if Parser.tokens.actual.type != "CLS":
+                    assign.children.append(Parser.parseOrexPR)
+                    while(Parser.tokens.actual.type == "COMMA"):
+                        Parser.tokens.selectNext()
+                        assign.children.append(Parser.parseOrexPR)
+                if Parser.tokens.actual.type != "CLS":
+                    raise Exception (") NOT FUND in FCALL 2")
+                Parser.tokens.selectNext()
+                if Parser.tokens.actual.type != "ENDCOM":
+                    raise Exception("; NOT FOUND in FCALL 2")
+                return assign
+
+
+                
         elif(Parser.tokens.actual.type == "SUM" or Parser.tokens.actual.type == "MIN" or Parser.tokens.actual.type == "NEG"):
             if(Parser.tokens.actual.type == "SUM"):
                 node = UnOp("+", [])
@@ -464,6 +518,55 @@ class Parser():
         else:
             raise Exception ("Factor error")    
 
+    @staticmethod
+    def parseFuncDefBlock():
+        funcArr = []
+        if Parser.tokens.actual.type == "TYPE":
+            while Parser.tokens.actual.type == "TYPE":
+                Parser.tokens.selectNext()
+                if Parser.tokens.actual.type == "IDENT":
+                    func_name = Parser.tokens.actual.value
+                    decNode = FuncDeclare(func_name, [])
+                    decVars = []
+                    Parser.tokens.selectNext()
+                    if Parser.tokens.actual.type == "OPN":
+                        Parser.tokens.selectNext()
+                        if(Parser.tokens.actual.type == "TYPE"):
+                            argType = Parser.tokens.actual.value
+                            Parser.tokens.selectNext()
+                            if(Parser.tokens.actual.type !="IDENT"):
+                                raise Exception ("ERROR FUNC IDENT")
+                            argName = Parser.tokens.actual.value
+                            decVars.append((argType,argName))
+                            Parser.tokens.selectNext()
+                            while(Parser.tokens.actual.type == "COMMA"):
+                                Parser.tokens.selectNext()
+                                if(Parser.tokens.actual.type !="TYPE"):
+                                    raise Exception ("ERROR FUNC TYPE")
+                                argType = Parser.tokens.actual.value
+                                Parser.tokens.selectNext()
+                                if(Parser.tokens.actual.type !="IDENT"):
+                                    raise Exception ("ERROR 1")
+                                argName = Parser.tokens.actual.value
+                                decVars.append((argType,argName))
+                                Parser.tokens.selectNext()
+                        if Parser.tokens.actual.type != "CLS":
+                            raise Exception ("ERROR 2")     
+                        decNode.children.append(decVars)
+                        Parser.tokens.selectNext()
+                        decNode.children.append(Parser.parseCommand())
+                        funcArr.append(decNode)
+                    else:
+                        raise Exception ("Did not find OPN in func")
+                else:
+                    raise Exception ("No name in function")
+            return funcArr            
+        else:
+            print("No function program")
+
+
+
+
 
     @staticmethod
     def parseBlock():
@@ -484,11 +587,9 @@ class Parser():
     def parseCommand():
         if Parser.tokens.actual.type == "IDENT":
             var_name = Parser.tokens.actual.value
-            var_node = Identifier(var_name, [])
-
             Parser.tokens.selectNext()
-
             if Parser.tokens.actual.type == "EQL":
+                var_node = Identifier(var_name, [])
                 assign = Assign("=", [])
                 assign.children.append(var_node)
                 value = Parser.parseOrexPR()
@@ -496,9 +597,25 @@ class Parser():
                 if Parser.tokens.actual.type != "ENDCOM":
                     raise Exception("; NOT FOUND")
                 Parser.tokens.selectNext()
+
+            elif Parser.tokens.actual.type == "OPN":
+                assign = FuncCall(var_name,[])
+                Parser.tokens.selectNext()
+                if Parser.tokens.actual.type != "CLS":
+                    assign.children.append(Parser.parseOrexPR)
+                    Parser.tokens.selectNext()
+                    while(Parser.tokens.actual.type == "COMMA"):
+                        Parser.tokens.selectNext()
+                        assign.children.append(Parser.parseOrexPR)
+                        Parser.tokens.selectNext()
+                if Parser.tokens.actual.type != "CLS":
+                    raise Exception (") NOT FUND in FCALL")
+                Parser.tokens.selectNext()
+                if Parser.tokens.actual.type != "ENDCOM":
+                    raise Exception("; NOT FOUND in FCALL")
+                Parser.tokens.selectNext()
             else:
                 raise Exception("COMMAND ERROR")
-            
             return assign
         
         elif Parser.tokens.actual.type == "TYPE":
@@ -515,9 +632,6 @@ class Parser():
                 raise Exception("FIRST ASSIGN ERROR")
             return firstAssign
 
-
-        
-
         elif Parser.tokens.actual.type == "PRINT":
             print_node = Println("PRINT", [])
             print_value = Parser.parseOrexPR()
@@ -527,6 +641,15 @@ class Parser():
             Parser.tokens.selectNext()
             return print_node
         
+        elif Parser.tokens.actual.type == "RETURN":
+            Parser.tokens.selectNext()
+            retNode = ReturnVal(Parser.parseOrexPR)
+            Parser.tokens.selectNext()
+            if Parser.tokens.actual.type != "ENDCOM":
+                raise Exception("; NOT FOUND")
+            Parser.tokens.selectNext()
+            return retNode
+
         elif Parser.tokens.actual.type == "WHILE":
             while_node = WhileOp('while', [])
             Parser.tokens.selectNext()
@@ -571,10 +694,15 @@ class Parser():
         #executa o compilador
         Parser.tokens = Parser().tokens(origin = code) 
         Parser.tokens.selectNext()
-        res =  Parser().parseBlock()
+        res =  Parser().parseFuncDefBlock()
+        ST = SymbolTable()
+        for funcs in res:
+            funcs.Evaluate(ST)
+        # print(ST.functions)
+        
         if(Parser.tokens.actual.type != "END"):
             raise Exception ("ERROR")
-        return res
+        return ST
     
 
         
@@ -586,9 +714,8 @@ def main():
         file += sys.argv[i]
     f = open(file,'r')
     comando = f.read()
-    resultado = Parser().run(comando)
-    ST = SymbolTable()
-    resultado.Evaluate(ST)
+    ST = Parser().run(comando)
+    FuncCall("main",[]).Evaluate(ST)
 
 if __name__ == "__main__":
     main()
