@@ -80,6 +80,12 @@ class SymbolTable:
             else:
                 self.sym[name] = (value,type)
 
+    def firsSet(self,name,value,type):
+        if name in self.sym:
+            pass
+        else:
+            self.sym[name] = (value,type)
+
     def getter(self, name, type):
         try:
             if type == "FUNC": 
@@ -147,13 +153,13 @@ class FirstAssign(Node):
         name = self.children[1]
         if(ST.getter(name," ") != "error"):
             raise Exception ("Variable " + name + " aready declared")
-        ST.setter(name, None ,type)
+        ST.firsSet(name, None ,type)
 
 class Assign(Node):
     def Evaluate(self, ST):
         name = self.children[0].value
-        expression = self.children[1].Evaluate(ST)
         type = ST.getter(name, " ")[1]
+        expression = self.children[1].Evaluate(ST)
         if(type == "error"):
             raise Exception ("Symbol "+name+ " not declared")
         if(expression[1] != type):
@@ -242,15 +248,23 @@ class FuncCall(Node):
         if(len(self.children) != len(funcList[0])):
             raise Exception ("Not enough args in FuncCall " + funcName)
         for i in range(len(funcList[0])):
-            print(self.children[0][i])
-            functionST.setter(funcList[0][i][1],self.children[0][i],funcList[0][i][0])
-        funcList[1].Evaluate(functionST)
+            if(len(self.children[i].Evaluate(ST))>1):
+                functionST.setter(funcList[0][i][1],self.children[i].Evaluate(ST)[0],funcList[0][i][0])
+            else:
+                functionST.setter(funcList[0][i][1],self.children[i].Evaluate(ST)[0],funcList[0][i][0])
 
+        funcList[1].Evaluate(functionST)
+        returnVal = functionST.getter("RETURN__VALUE","")
+        if(returnVal != "error"):
+            return returnVal
+
+        
 
 class ReturnVal(Node):
     def Evaluate(self,ST):
         retValue = self.value.Evaluate(ST)
-        return ST.getter(retValue, " ")
+        ST.firsSet("RETURN__VALUE", retValue[0],retValue[1])
+        return self.value.Evaluate(ST)
 
 
 
@@ -350,6 +364,89 @@ class Tokenizer:
                 self.position +=1
                 self.actual.value += self.origin[self.position]
         return self.actual
+
+
+
+  def seeNext(self):
+        actualVal = self.actual
+        actualPos = self.position
+        #se for o ultimo acaba
+        if (self.position >= len(self.origin)):
+            self.actual = Token(tToken= "END")
+            return self.actual.type
+        if(self.position < len(self.origin)):
+            #passa enquanto for espaço
+            while(self.origin[self.position] == " " or self.origin[self.position] == "\t"):
+                self.position += 1
+                #se for o ultimo acaba
+                if (self.position >= len(self.origin)):
+                    self.actual = Token(tToken= "END")
+                    retVal = self.actual
+                    self.actual = actualVal
+                    self.position = actualPos
+                    return retVal.type
+            #Aqui achou o proximo token valido.
+        
+            self.actual = Token(tToken= tToken_finder(self.origin[self.position]),value = self.origin[self.position])
+            self.position += 1
+            if((self.position < len(self.origin)) and self.actual.type == "NUM"):
+                while(tToken_finder(self.origin[self.position]) == "NUM"):
+                    self.actual.value += self.origin[self.position]
+                    self.position += 1
+                    if(self.position == len(self.origin)):
+                        break
+
+
+            if((self.position < len(self.origin)) and self.actual.type == "STRING"):
+                while(tToken_finder(self.origin[self.position]) != "STRING"):
+                    if(self.position == len(self.origin) or tToken_finder(self.origin[self.position]) == "ENDCOM"):
+                        raise Exception ("ASPAS DE STRING NÃO FECHADAS")
+                    self.actual.value += self.origin[self.position]
+                    self.position += 1
+                self.actual.value += self.origin[self.position]
+                self.position += 1
+
+            if((self.position < len(self.origin)) and self.actual.type == "IDENT"):
+                while(tToken_finder(self.origin[self.position]) == "IDENT" or tToken_finder(self.origin[self.position]) == "NUM"):
+                    self.actual.value += self.origin[self.position]
+                    self.position += 1
+                    if(self.actual.value == "else"):
+                        break
+                    if(self.position == len(self.origin)):
+                        break
+                identT = IdentType(self.actual.value)
+                if(identT != None):
+                    self.actual.type = identT
+
+
+            if((self.position < len(self.origin)) and self.actual.type == "ENDCOM"):
+                while(tToken_finder(self.origin[self.position]) == "ENDCOM"):
+                    self.actual.value += self.origin[self.position]
+                    self.position += 1
+                    if(self.position == len(self.origin)):
+                        break
+            if((self.position < len(self.origin)) and self.actual.type == "EQL"):
+                if(tToken_finder(self.origin[self.position]) == "EQL"):
+                    self.actual.value += self.origin[self.position]
+                    self.actual.type = "DUALEQL"
+                    self.position +=1
+
+            if(self.actual.type == "OR"):
+                if(tToken_finder(self.origin[self.position]) != "OR"):
+                    raise Exception("OR INCOMPLETE")
+                self.position +=1
+                self.actual.value += self.origin[self.position]
+
+            if(self.actual.type == "AND"):
+                if(tToken_finder(self.origin[self.position]) != "AND"):
+                    raise Exception("AND INCOMPLETE")
+                self.position +=1
+                self.actual.value += self.origin[self.position]
+        retVal = self.actual
+        self.actual = actualVal
+        self.position = actualPos
+        return retVal.type
+
 
         
 
@@ -462,28 +559,25 @@ class Parser():
             return node
         elif(Parser.tokens.actual.type== "IDENT"):
             nodeValue = Parser.tokens.actual.value
+            Parser.tokens.selectNext()
             if Parser.tokens.actual.type != "OPN":
+
                 node = Identifier()
                 node.value= nodeValue
-                Parser.tokens.selectNext()
                 return node
             else:
                 assign = FuncCall(nodeValue,[])
-                Parser.tokens.selectNext()
-                if Parser.tokens.actual.type != "CLS":
-                    assign.children.append(Parser.parseOrexPR)
+                if Parser.tokens.seeNext() != "CLS":
+                    assign.children.append(Parser.parseOrexPR())
                     while(Parser.tokens.actual.type == "COMMA"):
-                        Parser.tokens.selectNext()
-                        assign.children.append(Parser.parseOrexPR)
-                if Parser.tokens.actual.type != "CLS":
-                    raise Exception (") NOT FUND in FCALL 2")
+                        assign.children.append(Parser.parseOrexPR())
+                    if Parser.tokens.actual.type != "CLS":
+                        raise Exception (") NOT FUND in FCALL 2")
+                else:
+                    Parser.tokens.selectNext()
                 Parser.tokens.selectNext()
-                if Parser.tokens.actual.type != "ENDCOM":
-                    raise Exception("; NOT FOUND in FCALL 2")
                 return assign
-
-
-                
+        
         elif(Parser.tokens.actual.type == "SUM" or Parser.tokens.actual.type == "MIN" or Parser.tokens.actual.type == "NEG"):
             if(Parser.tokens.actual.type == "SUM"):
                 node = UnOp("+", [])
@@ -515,6 +609,8 @@ class Parser():
             else:
                 raise Exception("Read error")
             return node 
+        elif(Parser.tokens.actual.type == "CLS"):
+            pass
         else:
             raise Exception ("Factor error")    
 
@@ -587,6 +683,7 @@ class Parser():
     def parseCommand():
         if Parser.tokens.actual.type == "IDENT":
             var_name = Parser.tokens.actual.value
+
             Parser.tokens.selectNext()
             if Parser.tokens.actual.type == "EQL":
                 var_node = Identifier(var_name, [])
@@ -600,16 +697,14 @@ class Parser():
 
             elif Parser.tokens.actual.type == "OPN":
                 assign = FuncCall(var_name,[])
-                Parser.tokens.selectNext()
-                if Parser.tokens.actual.type != "CLS":
-                    assign.children.append(Parser.parseOrexPR)
-                    Parser.tokens.selectNext()
+                if Parser.tokens.seeNext() != "CLS":
+                    assign.children.append(Parser.parseOrexPR())
                     while(Parser.tokens.actual.type == "COMMA"):
-                        Parser.tokens.selectNext()
-                        assign.children.append(Parser.parseOrexPR)
-                        Parser.tokens.selectNext()
-                if Parser.tokens.actual.type != "CLS":
-                    raise Exception (") NOT FUND in FCALL")
+                        assign.children.append(Parser.parseOrexPR())
+                    if Parser.tokens.actual.type != "CLS":
+                        raise Exception (") NOT FUND in FCALL")
+                else:
+                    Parser.tokens.selectNext()
                 Parser.tokens.selectNext()
                 if Parser.tokens.actual.type != "ENDCOM":
                     raise Exception("; NOT FOUND in FCALL")
@@ -642,9 +737,7 @@ class Parser():
             return print_node
         
         elif Parser.tokens.actual.type == "RETURN":
-            Parser.tokens.selectNext()
-            retNode = ReturnVal(Parser.parseOrexPR)
-            Parser.tokens.selectNext()
+            retNode = ReturnVal(Parser.parseOrexPR())
             if Parser.tokens.actual.type != "ENDCOM":
                 raise Exception("; NOT FOUND")
             Parser.tokens.selectNext()

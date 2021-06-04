@@ -1,12 +1,15 @@
 
-int soma(int numero, int outro){
-    int somaFinal;
-    somaFinal = numero + outro;
-    println(somaFinal);
-    return somaFinal;
+int soma(int x, int y)
+{
+    int res;
+    res = x + y;
+    return res;        
 }
-int main(){
-    int somatotal;
-    soma(3,4);
-    println(somatotal);
+
+int main()
+{
+    int x;
+    soma(3,5);/*Ok fazer isso*/
+    x = soma(3,5);
+    println(x);
 }
