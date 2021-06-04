@@ -13,5 +13,6 @@ int qualquer(){
 
 int main(){
     int y;
-    y = qualquer();
+    y=0;
+    y = qualquer(y);
 }
