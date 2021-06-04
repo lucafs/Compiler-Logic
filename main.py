@@ -76,6 +76,8 @@ class SymbolTable:
             elif(type == "int"):
                 value = int(value)
             if(type == "FUNCTION"):
+                if(name in self.functions):
+                    raise Exception("Can't use the same function name = " + name)
                 self.functions[name] = (value)
             else:
                 self.sym[name] = (value,type)
@@ -243,12 +245,15 @@ class FuncCall(Node):
         funcList = ST.getter(funcName,"FUNC")
         functionST = SymbolTable()
         functionST.setFuncs(ST.functions)
-
         if(funcList == "error"):
             raise Exception ("Func not Declared " + funcName)
         if(len(self.children) != len(funcList[0])):
             raise Exception ("Not enough args in FuncCall " + funcName)
         for i in range(len(funcList[0])):
+            if(self.children[i].Evaluate(ST) == "error"):
+                raise Exception("Variable not declared")
+            # print(self.children[i].Evaluate(ST))
+
             if(len(self.children[i].Evaluate(ST))>1):
                 functionST.setter(funcList[0][i][1],self.children[i].Evaluate(ST)[0],funcList[0][i][0])
             else:

@@ -1,18 +1,19 @@
-/*Ok: para eval quando encontra return*/
+/*Ok*/
 
-int qualquer(){
-    int x;
-    x = 10;
-    
-    println(x);    
-    return x;
-    
-    println(x*2);
+int soma(int x, int y)
+{
+    int res;
+    res = x + y;
+    return res;    
 }
 
-
-int main(){
-    int y;
-    y=0;
-    y = qualquer(y);
+int main()
+{
+    bool res;
+    int x;
+    x = 3;
+    
+    res = soma(x,2) == 8;
+    
+    println(res);
 }
