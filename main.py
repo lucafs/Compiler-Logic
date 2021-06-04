@@ -243,6 +243,7 @@ class FuncCall(Node):
         funcList = ST.getter(funcName,"FUNC")
         functionST = SymbolTable()
         functionST.setFuncs(ST.functions)
+
         if(funcList == "error"):
             raise Exception ("Func not Declared " + funcName)
         if(len(self.children) != len(funcList[0])):
@@ -270,8 +271,15 @@ class ReturnVal(Node):
 
 class Comandos(Node):
     def Evaluate(self, ST):
+        ReturnHappend = True
         for x in self.children:
-            x.Evaluate(ST)
+            if(ReturnHappend):
+                x.Evaluate(ST)
+            if(isinstance(x,ReturnVal)):
+                ReturnHappend = False
+            elif(not ReturnHappend and isinstance(x,NoOp)):
+                ReturnHappend = True
+
 
 
 
@@ -658,7 +666,7 @@ class Parser():
                     raise Exception ("No name in function")
             return funcArr            
         else:
-            print("No function program")
+            return funcArr
 
 
 
@@ -672,6 +680,7 @@ class Parser():
             while(Parser.tokens.actual.type != "CLS_COM"):
                 commands.children.append(Parser.parseCommand())
             if(Parser.tokens.actual.type == "CLS_COM"):
+                commands.children.append(NoOp())
                 Parser.tokens.selectNext()
             else:
                 raise Exception("} not found")
@@ -789,10 +798,9 @@ class Parser():
         Parser.tokens.selectNext()
         res =  Parser().parseFuncDefBlock()
         ST = SymbolTable()
+        ReturnHappend = False
         for funcs in res:
-            funcs.Evaluate(ST)
-        # print(ST.functions)
-        
+            funcs.Evaluate(ST)        
         if(Parser.tokens.actual.type != "END"):
             raise Exception ("ERROR")
         return ST
