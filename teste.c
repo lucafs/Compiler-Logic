@@ -5,7 +5,7 @@
     
     b = 32;
     c = 32;
-    a = true;
+    a = false;
 
     if ((b && c) == a) {
     	println(1);

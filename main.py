@@ -353,14 +353,9 @@ class IfOp(Node):
     def Evaluate(self, ST):
         loopNum = ST.get_loopNum()
         command = " CMP EBX, False ;\n"
-        if len(self.children) > 2:
-            command += " JE ELSE_{0} ;\n".format(loopNum)
-        else:
-            command += " JE EXIT_{0} ;\n".format(loopNum)
-        command += " JMP EXIT_{0} ;\n".format(loopNum)
+        command += " JE EXIT_{0} ;\n".format(loopNum)
         if(len(self.children) > 2):
-            command += ' ELSE_{0} ;\n'.format(loopNum)
-        command += ' EXIT_{0} ;'.format(loopNum)
+            command += ' EXIT_{0} ;'.format(loopNum)
         Assembly.AddCommand(command)
         if (self.children[0].Evaluate(ST)[0]):
             self.children[1].Evaluate(ST)

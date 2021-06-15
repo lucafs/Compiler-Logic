@@ -92,10 +92,12 @@ _start:
  MOV [EBP-2], EBX;
  MOV EBX, 32 ;
  MOV [EBP-3], EBX;
- MOV EBX, False ;
+ MOV EBX, True ;
  MOV [EBP-1], EBX;
  CMP EBX, False ;
- JE EXIT_4 ;
+ JE ELSE_4 ;
+ JMP EXIT_4 ;
+ ELSE_4 ;
  EXIT_4 ;
  POP EAX 
  CMP EAX, EBX
@@ -106,7 +108,7 @@ _start:
  MOV EBX, [EBP-2] ;
  MOV EBX, [EBP-3] ;
  MOV EBX, [EBP-1] ;
- MOV EBX, 2 ;
+ MOV EBX, 1 ;
  PUSH EBX ;
  CALL print ;
  POP EBX ;
